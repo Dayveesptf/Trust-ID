@@ -1,0 +1,5 @@
+<svg width="256" height="256" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
+  <rect x="0" y="0" width="64" height="64" rx="15" fill="#10B981"/>
+  <text x="32" y="41" font-family="DM Sans" font-weight="700" font-size="26"
+        fill="#0D2D52" text-anchor="middle">ID</text>
+</svg>
