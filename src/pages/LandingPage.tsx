@@ -14,7 +14,7 @@ const features = [
   { title: "What TrustID Does", body: "TrustID analyses your existing financial behaviour — how you earn, save, repay and manage money — and transforms it into a clear, explainable credibility profile. No guesswork. No black box." },
   { title: "Why Behaviour Matters", body: "Traditional credit history isn't always available for young people. TrustID fills that gap by looking at how you actually manage money, not just whether you've had a loan before." },
   { title: "How You Can Improve", body: "TrustID shows you exactly what drives your score and provides practical, supportive recommendations to help you build stronger financial habits over time." },
-  { title: "Supporting Financial Institutions", body: "TrustID provides Ecobank with additional behavioural insights to help analysts make more informed decisions. TrustID does not make lending decisions — Ecobank does." },
+  { title: "Supporting Finance Institutions", body: "TrustID provides Ecobank with additional behavioural insights to help analysts make more informed decisions. TrustID does not make lending decisions — Ecobank does." },
 ];
 
 export default function LandingPage({ navigate }: Props) {
@@ -179,7 +179,7 @@ export default function LandingPage({ navigate }: Props) {
           onClick={() => navigate("signup")}
           className="bg-[#0D2D52] text-white font-semibold px-8 py-4 rounded-xl hover:bg-[#163D6A] transition-all shadow-sm hover:shadow-md text-base"
         >
-          Build My Trust Profile
+          Build Trust Profile
         </button>
         <p className="mt-4 text-xs text-[#94A3B8]">Free to use · No credit history needed · Transparent and explainable</p>
       </section>
