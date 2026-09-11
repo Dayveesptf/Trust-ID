@@ -1,126 +1,360 @@
+import { useEffect, useState } from "react";
 import { CustomerLayout } from "../components/Layout";
-import { Card, Button, ScoreRing } from "../components/ui";
-import { currentUser } from "../data/mockData";
+import {
+  Badge,
+  Button,
+  Card,
+} from "../components/ui";
+import {
+  getEcobankOpportunities,
+  EcobankOpportunity,
+} from "../services/ecobankService";
+import {
+  getTrustProfile,
+  TrustProfile,
+} from "../services/financialProfileService";
 
-interface Props { navigate: (s: string) => void; }
+function getBandVariant(
+  band: string
+): "success" | "good" | "fair" | "warning" | "info" | "neutral" {
+  switch (band) {
+    case "Excellent":
+      return "success";
+    case "Strong":
+      return "good";
+    case "Good":
+      return "good";
+    case "Fair":
+      return "fair";
+    case "Developing":
+      return "warning";
+    case "Needs Improvement":
+      return "neutral";
+    default:
+      return "neutral";
+  }
+}
 
-export default function OpportunityPage({ navigate }: Props) {
+function getCategoryIcon(category: string): string {
+  const value = category.toLowerCase();
+
+  if (value.includes("loan") || value.includes("credit")) {
+    return "💳";
+  }
+
+  if (value.includes("saving")) {
+    return "💰";
+  }
+
+  if (value.includes("business")) {
+    return "🏪";
+  }
+
+  if (value.includes("account")) {
+    return "🏦";
+  }
+
+  if (value.includes("investment")) {
+    return "📈";
+  }
+
+  return "✨";
+}
+
+export default function OpportunityPage({
+  navigate,
+}: {
+  navigate: (page: string) => void;
+}) {
+  const [profile, setProfile] = useState<TrustProfile | null>(
+    null
+  );
+
+  const [opportunities, setOpportunities] = useState<
+    EcobankOpportunity[]
+  >([]);
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    async function loadOpportunities() {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [trustProfile, ecobankOpportunities] =
+          await Promise.all([
+            getTrustProfile(),
+            getEcobankOpportunities(),
+          ]);
+
+        setProfile(trustProfile);
+        setOpportunities(ecobankOpportunities);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load Ecobank opportunities."
+        );
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadOpportunities();
+  }, []);
+
+  if (loading) {
+    return (
+      <CustomerLayout current="opportunity" navigate={navigate}>
+        <div className="p-6 lg:p-10 max-w-7xl mx-auto">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 w-72 bg-slate-200 rounded" />
+            <div className="h-4 w-96 bg-slate-200 rounded" />
+
+            <div className="h-36 bg-slate-200 rounded-2xl" />
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              <div className="h-64 bg-slate-200 rounded-2xl" />
+              <div className="h-64 bg-slate-200 rounded-2xl" />
+            </div>
+          </div>
+        </div>
+      </CustomerLayout>
+    );
+  }
+
+  if (error) {
+    return (
+      <CustomerLayout current="opportunity" navigate={navigate}>
+        <div className="p-6 lg:p-10 max-w-4xl mx-auto">
+          <Card className="p-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#E8F0F7] flex items-center justify-center mx-auto mb-4 text-2xl">
+              🏦
+            </div>
+
+            <h1 className="text-xl font-semibold text-[#0D2D52] mb-2">
+              Ecobank Opportunities
+            </h1>
+
+            <p className="text-sm text-slate-500 mb-6">
+              {error}
+            </p>
+
+            <Button
+              onClick={() => navigate("dashboard")}
+            >
+              Back to Dashboard
+            </Button>
+          </Card>
+        </div>
+      </CustomerLayout>
+    );
+  }
+
   return (
     <CustomerLayout current="opportunity" navigate={navigate}>
-      <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8">
+      <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <div className="mb-8">
-          <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-widest mb-1">Opportunities</p>
-          <h1 className="text-2xl font-bold text-[#0D1F35] tracking-tight">Your Financial Profile Can Tell a Bigger Story</h1>
-          <p className="text-sm text-[#64748B] mt-2 leading-relaxed max-w-xl">
-            TrustID can provide additional financial behaviour insights that may help eligible financial institutions better understand customers with limited traditional credit history.
+        <div>
+          <p className="text-sm font-medium text-[#2563A0] mb-2">
+            Ecobank Opportunities
+          </p>
+
+          <h1 className="text-2xl lg:text-3xl font-bold text-[#0D2D52]">
+            Opportunities matched to your profile
+          </h1>
+
+          <p className="text-slate-500 mt-2 max-w-2xl">
+            Explore financial opportunities that may be relevant
+            to your current Trust Profile.
           </p>
         </div>
 
-        {/* Main value prop card */}
-        <Card className="mb-6 bg-[#0D2D52] text-white overflow-hidden" padding="none">
-          <div className="px-7 py-8">
-            <div className="flex flex-col sm:flex-row items-center gap-8">
-              <div className="relative shrink-0">
-                <ScoreRing score={currentUser.trustScore} max={currentUser.maxScore} size={120} color="#10B981" />
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-2xl font-bold text-white font-['JetBrains_Mono',monospace]">{currentUser.trustScore}</p>
-                  <p className="text-white/50 text-xs">/ 850</p>
+        {/* Trust Profile Summary */}
+        {profile && (
+          <Card className="p-6 lg:p-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div>
+                <p className="text-sm text-slate-500 mb-2">
+                  Your current Trust Profile
+                </p>
+
+                <div className="flex items-end gap-3">
+                  <span className="text-4xl font-bold text-[#0D2D52]">
+                    {profile.totalScore}
+                  </span>
+
+                  <span className="text-slate-400 mb-1">
+                    / 850
+                  </span>
+
+                  <Badge
+                    variant={getBandVariant(profile.band)}
+                    size="md"
+                  >
+                    {profile.band}
+                  </Badge>
                 </div>
               </div>
-              <div className="text-center sm:text-left">
-                <div className="inline-flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-500/30 mb-3">
-                  Strong Financial Profile
-                </div>
-                <h2 className="text-xl font-bold text-white mb-2">Your profile demonstrates financial credibility</h2>
-                <p className="text-white/70 text-sm leading-relaxed">
-                  TrustID provides additional information that may support financial product eligibility and lending review.
+
+              <div className="max-w-md">
+                <p className="text-sm text-slate-600 leading-6">
+                  Your Trust Profile helps provide context around
+                  your financial behaviour. It does not guarantee
+                  approval for any banking product.
                 </p>
               </div>
             </div>
+          </Card>
+        )}
+
+        {/* Opportunities */}
+        <section>
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold text-[#0D2D52]">
+              Recommended opportunities
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-1">
+              These opportunities are presented based on the
+              information available in your Trust Profile.
+            </p>
           </div>
-        </Card>
 
-        {/* How it works equation */}
-        <Card className="mb-6">
-          <p className="text-xs font-semibold text-[#64748B] uppercase tracking-widest mb-5">How TrustID supports financial institutions</p>
-          <div className="flex flex-col sm:flex-row items-center gap-3">
-            <div className="flex-1 bg-[#F8FAFB] border border-[#E2EAF2] rounded-2xl p-4 text-center w-full">
-              <p className="text-xs text-[#94A3B8] mb-2 font-medium uppercase tracking-wide">Traditional information</p>
-              <div className="space-y-1.5">
-                {["Bank account history", "Identity verification", "Employment status"].map((t) => (
-                  <div key={t} className="flex items-center gap-2 text-xs text-[#374151]">
-                    <div className="h-1.5 w-1.5 rounded-full bg-[#94A3B8]" />
-                    {t}
-                  </div>
-                ))}
+          {opportunities.length === 0 ? (
+            <Card className="p-8 text-center">
+              <div className="text-3xl mb-3">
+                🏦
               </div>
-            </div>
 
-            <div className="text-2xl font-bold text-[#0D2D52] shrink-0">+</div>
+              <h3 className="font-semibold text-[#0D2D52] mb-2">
+                No opportunities available yet
+              </h3>
 
-            <div className="flex-1 bg-[#EFF4F9] border border-[#C8D9EC] rounded-2xl p-4 text-center w-full">
-              <p className="text-xs text-[#0D2D52] mb-2 font-semibold uppercase tracking-wide">TrustID behavioural insights</p>
-              <div className="space-y-1.5">
-                {["Income consistency", "Savings behaviour", "Repayment patterns", "Cash-flow stability", "Financial discipline"].map((t) => (
-                  <div key={t} className="flex items-center gap-2 text-xs text-[#0D2D52]">
-                    <div className="h-1.5 w-1.5 rounded-full bg-[#10B981]" />
-                    {t}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div className="text-2xl font-bold text-[#10B981] shrink-0">=</div>
-
-            <div className="flex-1 bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-center w-full">
-              <p className="text-xs text-emerald-700 mb-2 font-semibold uppercase tracking-wide">More complete context</p>
-              <p className="text-xs text-emerald-800 leading-relaxed">
-                A richer, more accurate picture of a customer's financial behaviour to support informed decision-making.
+              <p className="text-sm text-slate-500 max-w-lg mx-auto">
+                Continue building your financial profile and check
+                back later for relevant opportunities.
               </p>
-            </div>
-          </div>
-        </Card>
 
-        {/* What this means */}
-        <Card className="mb-6">
-          <p className="text-sm font-bold text-[#0D1F35] mb-4">What this means for you</p>
-          <div className="space-y-3">
-            {[
-              { icon: "📋", title: "Richer financial context", body: "Your TrustID profile gives Ecobank analysts additional behavioural context when reviewing your financial position." },
-              { icon: "🔍", title: "Transparent and explainable", body: "Every insight in your profile is clearly explained — no hidden calculations, no black boxes." },
-              { icon: "🤝", title: "Supporting the review process", body: "TrustID helps provide a more complete picture, particularly for customers who may have limited traditional credit history." },
-            ].map((item) => (
-              <div key={item.title} className="flex gap-4 p-4 rounded-xl bg-[#F8FAFB] border border-[#E2EAF2]">
-                <span className="text-xl shrink-0">{item.icon}</span>
-                <div>
-                  <p className="text-sm font-semibold text-[#0D1F35] mb-1">{item.title}</p>
-                  <p className="text-xs text-[#64748B] leading-relaxed">{item.body}</p>
-                </div>
+              <div className="mt-6">
+                <Button
+                  onClick={() =>
+                    navigate("financial-growth")
+                  }
+                >
+                  Improve My Profile
+                </Button>
               </div>
-            ))}
-          </div>
-        </Card>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {opportunities.map((opportunity) => (
+                <Card
+                  key={opportunity.id}
+                  className="p-6 flex flex-col"
+                >
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-[#EAF1F7] flex items-center justify-center text-2xl shrink-0">
+                        {getCategoryIcon(
+                          opportunity.category
+                        )}
+                      </div>
 
-        {/* Important disclaimer */}
-        <div className="bg-[#EFF4F9] border border-[#C8D9EC] rounded-2xl p-5 mb-6">
-          <div className="flex gap-3">
-            <svg className="h-5 w-5 text-[#0D2D52] shrink-0 mt-0.5" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5">
-              <circle cx="10" cy="10" r="8.5" />
-              <path d="M10 9v6M10 7v.5" strokeLinecap="round" />
-            </svg>
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#2563A0] mb-1">
+                          {opportunity.category}
+                        </p>
+
+                        <h3 className="text-lg font-semibold text-[#0D2D52]">
+                          {opportunity.title}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {opportunity.badge && (
+                      <Badge variant="info">
+                        {opportunity.badge}
+                      </Badge>
+                    )}
+                  </div>
+
+                  <p className="text-sm text-slate-600 leading-6 mb-6">
+                    {opportunity.description}
+                  </p>
+
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Why it may be relevant
+                      </p>
+
+                      <p className="text-sm text-slate-600 leading-6">
+                        {opportunity.relevance}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Eligibility
+                      </p>
+
+                      <p className="text-sm text-slate-600 leading-6">
+                        {opportunity.eligibility}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto pt-5 border-t border-slate-100 flex items-center justify-between gap-4">
+                    <p className="text-xs text-slate-400">
+                      Final eligibility and approval are determined
+                      by Ecobank.
+                    </p>
+
+                    <Button
+                      onClick={() => {
+                        if (opportunity.action) {
+                          window.open(
+                            opportunity.action,
+                            "_blank",
+                            "noopener,noreferrer"
+                          );
+                        }
+                      }}
+                    >
+                      Learn More
+                    </Button>
+                  </div>
+                </Card>
+              ))}
+            </div>
+          )}
+        </section>
+
+        {/* Responsible Lending Message */}
+        <Card className="p-6 lg:p-8 bg-[#F4F8FB]">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shrink-0">
+              ℹ️
+            </div>
+
             <div>
-              <p className="text-sm font-bold text-[#0D2D52] mb-1">Important to understand</p>
-              <p className="text-sm text-[#374151] leading-relaxed">
-                TrustID provides additional information that <span className="font-semibold">may support</span> financial product eligibility and lending review. TrustID does not guarantee any financial product or lending outcome. Ecobank retains full responsibility for all final decisions.
+              <h3 className="font-semibold text-[#0D2D52] mb-2">
+                A Trust Profile is not a loan approval
+              </h3>
+
+              <p className="text-sm text-slate-600 leading-6">
+                TrustID provides an explainable view of financial
+                behaviour to help users understand their financial
+                credibility. Any product eligibility, credit
+                assessment or lending decision remains with
+                Ecobank and is subject to its applicable criteria.
               </p>
             </div>
           </div>
-        </div>
-
-        <Button onClick={() => navigate("dashboard")} size="lg">
-          Continue Exploring →
-        </Button>
+        </Card>
       </div>
     </CustomerLayout>
   );

@@ -1,29 +1,48 @@
 import { useState } from "react";
-import { Button, RadioOption } from "../components/ui";
-import logotext from "../assets/logo-nav-light.png"
 
+import { Button } from "../components/ui";
+import { useAuth } from "../context/AuthContext";
+import { saveOnboarding } from "../services/onboardingService";
 
-interface Props { navigate: (s: string) => void; }
+import logotext from "../assets/logo-nav-light.png";
+
+interface Props {
+  navigate: (s: string) => void;
+}
 
 const steps = [
   {
     step: 1,
     title: "What is your primary source of income?",
-    subtitle: "This helps us understand your income pattern and regularity.",
+    subtitle:
+      "This helps us understand your income pattern and regularity.",
     field: "income",
-    options: ["Salary", "Business", "Freelancing", "Contract Work", "Other"],
+    options: [
+      "Salary",
+      "Business",
+      "Freelancing",
+      "Contract Work",
+      "Other",
+    ],
   },
   {
     step: 2,
     title: "How frequently do you receive income?",
-    subtitle: "Knowing your payment cycle helps us interpret your cash-flow behaviour accurately.",
+    subtitle:
+      "Knowing your payment cycle helps us interpret your cash-flow behaviour accurately.",
     field: "frequency",
-    options: ["Daily", "Weekly", "Monthly", "Irregularly"],
+    options: [
+      "Daily",
+      "Weekly",
+      "Monthly",
+      "Irregularly",
+    ],
   },
   {
     step: 3,
     title: "What are your financial goals?",
-    subtitle: "Your goals help us tailor recommendations to what matters most to you.",
+    subtitle:
+      "Your goals help us tailor recommendations to what matters most to you.",
     field: "goals",
     options: [
       "Save more",
@@ -36,16 +55,55 @@ const steps = [
   },
 ];
 
+const incomeSourceMap: Record<string, "salary" | "business" | "freelance" | "allowance" | "multiple" | "other"> = {
+  Salary: "salary",
+  Business: "business",
+  Freelancing: "freelance",
+  "Contract Work": "multiple",
+  Other: "other",
+};
+
+const incomeFrequencyMap: Record<
+  string,
+  "daily" | "weekly" | "monthly" | "irregular"
+> = {
+  Daily: "daily",
+  Weekly: "weekly",
+  Monthly: "monthly",
+  Irregularly: "irregular",
+};
+
+const goalMap: Record<
+  string,
+  "save" | "access_credit" | "start_business" | "manage_spending" | "build_credibility"
+> = {
+  "Save more": "save",
+  "Manage spending": "manage_spending",
+  "Build financial credibility": "build_credibility",
+  "Access financial products": "access_credit",
+  "Improve financial discipline": "manage_spending",
+};
+
 export default function OnboardingPage({ navigate }: Props) {
+  const { refreshUser } = useAuth();
+
   const [step, setStep] = useState(0);
-  const [answers, setAnswers] = useState<Record<string, string | string[]>>({
+
+  const [answers, setAnswers] = useState<
+    Record<string, string | string[]>
+  >({
     income: "",
     frequency: "",
     goals: [],
   });
 
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
   const current = steps[step];
+
   const value = answers[current.field];
+
   const isMulti = current.multi;
 
   const canAdvance = isMulti
@@ -53,50 +111,134 @@ export default function OnboardingPage({ navigate }: Props) {
     : (value as string).length > 0;
 
   const select = (opt: string) => {
+    setError("");
+
     if (isMulti) {
       const arr = value as string[];
+
       setAnswers((a) => ({
         ...a,
-        [current.field]: arr.includes(opt) ? arr.filter((x) => x !== opt) : [...arr, opt],
+        [current.field]: arr.includes(opt)
+          ? arr.filter((x) => x !== opt)
+          : [...arr, opt],
       }));
     } else {
-      setAnswers((a) => ({ ...a, [current.field]: opt }));
+      setAnswers((a) => ({
+        ...a,
+        [current.field]: opt,
+      }));
     }
   };
 
-  const next = () => {
-    if (step < steps.length - 1) setStep((s) => s + 1);
-    else navigate("consent");
+  const finishOnboarding = async () => {
+    const income = answers.income as string;
+    const frequency = answers.frequency as string;
+    const goals = answers.goals as string[];
+
+    const payload = {
+      incomeSource: incomeSourceMap[income],
+      incomeFrequency: incomeFrequencyMap[frequency],
+      goals: goals.map((goal) => goalMap[goal]),
+    };
+
+    if (
+      !payload.incomeSource ||
+      !payload.incomeFrequency
+    ) {
+      setError(
+        "Please complete all required onboarding questions."
+      );
+      return;
+    }
+
+    try {
+      setSaving(true);
+      setError("");
+
+      await saveOnboarding(payload);
+
+      /*
+       * The backend sets onboardingCompleted = true.
+       * Refresh the authenticated user so AuthContext
+       * immediately knows about that change.
+       */
+      await refreshUser();
+
+      navigate("consent");
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Unable to save your onboarding information."
+      );
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const progressPct = ((step + 1) / steps.length) * 100;
+  const next = async () => {
+    if (!canAdvance || saving) {
+      return;
+    }
+
+    if (step < steps.length - 1) {
+      setStep((s) => s + 1);
+      return;
+    }
+
+    await finishOnboarding();
+  };
+
+  const progressPct =
+    ((step + 1) / steps.length) * 100;
 
   return (
     <div className="min-h-screen bg-[#F8FAFB] flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-lg animate-fade-in">
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-2">
-            <img src={logotext} alt="TrustID" className="h-7 w-auto" />
+            <img
+              src={logotext}
+              alt="TrustID"
+              className="h-7 w-auto"
+            />
           </div>
+
           <span className="text-xs font-semibold text-[#64748B] bg-white border border-[#E2EAF2] px-3 py-1.5 rounded-full">
             Step {step + 1} of {steps.length}
           </span>
         </div>
 
-        {/* Progress bar */}
+        {/* Progress */}
         <div className="mb-8">
           <div className="h-1.5 w-full bg-[#E2EAF2] rounded-full overflow-hidden">
             <div
               className="h-full bg-[#0D2D52] rounded-full transition-all duration-500"
-              style={{ width: `${progressPct}%` }}
+              style={{
+                width: `${progressPct}%`,
+              }}
             />
           </div>
+
           <div className="flex mt-3 gap-2">
             {steps.map((_, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className={`h-2 w-2 rounded-full transition-colors ${i <= step ? "bg-[#0D2D52]" : "bg-[#E2EAF2]"}`} />
-                {i < steps.length - 1 && <div className="h-px w-6 bg-[#E2EAF2]" />}
+              <div
+                key={i}
+                className="flex items-center gap-2"
+              >
+                <div
+                  className={`h-2 w-2 rounded-full transition-colors ${
+                    i <= step
+                      ? "bg-[#0D2D52]"
+                      : "bg-[#E2EAF2]"
+                  }`}
+                />
+
+                {i < steps.length - 1 && (
+                  <div className="h-px w-6 bg-[#E2EAF2]" />
+                )}
               </div>
             ))}
           </div>
@@ -104,14 +246,25 @@ export default function OnboardingPage({ navigate }: Props) {
 
         {/* Question card */}
         <div className="bg-white rounded-2xl border border-[#E2EAF2] p-7 shadow-sm mb-6 animate-fade-in-up">
+
           <div className="h-10 w-10 rounded-xl bg-[#EFF4F9] flex items-center justify-center mb-5">
-            <span className="text-[#0D2D52] font-bold text-sm font-['JetBrains_Mono',monospace]">0{step + 1}</span>
+            <span className="text-[#0D2D52] font-bold text-sm font-['JetBrains_Mono',monospace]">
+              0{step + 1}
+            </span>
           </div>
-          <h2 className="text-xl font-bold text-[#0D1F35] mb-2 tracking-tight">{current.title}</h2>
-          <p className="text-sm text-[#64748B] mb-6 leading-relaxed">{current.subtitle}</p>
+
+          <h2 className="text-xl font-bold text-[#0D1F35] mb-2 tracking-tight">
+            {current.title}
+          </h2>
+
+          <p className="text-sm text-[#64748B] mb-6 leading-relaxed">
+            {current.subtitle}
+          </p>
 
           {isMulti && (
-            <p className="text-xs text-[#94A3B8] mb-3 font-medium">Select all that apply</p>
+            <p className="text-xs text-[#94A3B8] mb-3 font-medium">
+              Select all that apply
+            </p>
           )}
 
           <div className="flex flex-col gap-2.5">
@@ -119,24 +272,47 @@ export default function OnboardingPage({ navigate }: Props) {
               const selected = isMulti
                 ? (value as string[]).includes(opt)
                 : value === opt;
+
               return (
                 <button
                   key={opt}
+                  type="button"
                   onClick={() => select(opt)}
                   className={`
                     w-full text-left px-4 py-3.5 rounded-xl border-2 transition-all duration-150 text-sm font-medium flex items-center gap-3
-                    ${selected
-                      ? "border-[#0D2D52] bg-[#EFF4F9] text-[#0D2D52]"
-                      : "border-[#E2EAF2] bg-[#F8FAFB] text-[#374151] hover:border-[#A9C0DC] hover:bg-white"}
+                    ${
+                      selected
+                        ? "border-[#0D2D52] bg-[#EFF4F9] text-[#0D2D52]"
+                        : "border-[#E2EAF2] bg-[#F8FAFB] text-[#374151] hover:border-[#A9C0DC] hover:bg-white"
+                    }
                   `}
                 >
-                  <div className={`h-5 w-5 rounded-${isMulti ? "md" : "full"} border-2 flex items-center justify-center shrink-0 transition-all ${selected ? "border-[#0D2D52] bg-[#0D2D52]" : "border-[#CBD5E1]"}`}>
+                  <div
+                    className={`h-5 w-5 rounded-${
+                      isMulti ? "md" : "full"
+                    } border-2 flex items-center justify-center shrink-0 transition-all ${
+                      selected
+                        ? "border-[#0D2D52] bg-[#0D2D52]"
+                        : "border-[#CBD5E1]"
+                    }`}
+                  >
                     {selected && (
-                      <svg className="w-3 h-3 text-white" viewBox="0 0 10 10" fill="none">
-                        <path d="M2 5l2 2.5 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <svg
+                        className="w-3 h-3 text-white"
+                        viewBox="0 0 10 10"
+                        fill="none"
+                      >
+                        <path
+                          d="M2 5l2 2.5 4-4"
+                          stroke="currentColor"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                     )}
                   </div>
+
                   {opt}
                 </button>
               );
@@ -144,20 +320,45 @@ export default function OnboardingPage({ navigate }: Props) {
           </div>
         </div>
 
+        {/* Error */}
+        {error && (
+          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+            <p className="text-sm text-red-700">
+              {error}
+            </p>
+          </div>
+        )}
+
         {/* Navigation */}
         <div className="flex items-center gap-3">
           {step > 0 && (
-            <Button variant="secondary" onClick={() => setStep((s) => s - 1)} className="flex-1">
+            <Button
+              variant="secondary"
+              onClick={() => setStep((s) => s - 1)}
+              className="flex-1"
+              disabled={saving}
+            >
               Back
             </Button>
           )}
-          <Button onClick={next} disabled={!canAdvance} className={step > 0 ? "flex-1" : "w-full"} size="lg">
-            {step < steps.length - 1 ? "Continue" : "Finish Setup →"}
+
+          <Button
+            onClick={next}
+            disabled={!canAdvance || saving}
+            className={step > 0 ? "flex-1" : "w-full"}
+            size="lg"
+          >
+            {saving
+              ? "Saving..."
+              : step < steps.length - 1
+                ? "Continue"
+                : "Finish Setup →"}
           </Button>
         </div>
 
         <p className="text-center text-xs text-[#94A3B8] mt-4">
-          Your answers help personalise your experience. They don't affect your score.
+          Your answers help personalise your experience.
+          They don't affect your score.
         </p>
       </div>
     </div>
