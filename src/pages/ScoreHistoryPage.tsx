@@ -14,8 +14,8 @@ import {
 import {
   getScoreHistory,
   getTrustProfile,
-  ScoreHistoryItem,
-  TrustProfile,
+  type ScoreHistoryItem,
+  type TrustProfile,
 } from "../services/financialProfileService";
 
 interface Props {
@@ -31,115 +31,120 @@ interface ChartPoint {
   createdAt: string;
 }
 
-const CustomTooltip = ({ active, payload }: any) => {
-  if (active && payload?.length) {
-    return (
-      <div className="bg-white border border-[#E2EAF2] rounded-xl px-4 py-3 shadow-lg">
-        <p className="text-xs text-[#64748B] mb-1">
-          {payload[0]?.payload?.date}
-        </p>
-
-        <p className="text-lg font-bold text-[#0D2D52] font-['JetBrains_Mono',monospace]">
-          {payload[0].value}
-        </p>
-
-        <p className="text-xs text-[#94A3B8]">TrustID Score</p>
-      </div>
-    );
-  }
-
-  return null;
-};
-
 function formatDate(dateString: string) {
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
   return new Intl.DateTimeFormat("en-NG", {
     day: "numeric",
     month: "short",
     year: "numeric",
-  }).format(new Date(dateString));
+  }).format(date);
 }
 
 function formatMonth(dateString: string) {
+  const date = new Date(dateString);
+
+  if (Number.isNaN(date.getTime())) return "—";
+
   return new Intl.DateTimeFormat("en-NG", {
     month: "short",
-  }).format(new Date(dateString));
+  }).format(date);
 }
 
 function getFilterStartDate(filter: string) {
-  const now = new Date();
+  const date = new Date();
 
   switch (filter) {
     case "7 days":
-      now.setDate(now.getDate() - 7);
+      date.setDate(date.getDate() - 7);
       break;
 
     case "30 days":
-      now.setDate(now.getDate() - 30);
+      date.setDate(date.getDate() - 30);
       break;
 
     case "6 months":
-      now.setMonth(now.getMonth() - 6);
+      date.setMonth(date.getMonth() - 6);
       break;
 
     case "1 year":
-      now.setFullYear(now.getFullYear() - 1);
+      date.setFullYear(date.getFullYear() - 1);
       break;
 
     default:
       return null;
   }
 
-  return now;
+  return date;
 }
 
 function getMilestoneNote(
   previousScore: number | null,
   currentScore: number
 ) {
-  if (previousScore === null) {
-    return null;
-  }
+  if (previousScore === null) return null;
 
   const thresholds = [
-    {
-      score: 800,
-      note: "Reached Excellent financial profile",
-    },
-    {
-      score: 700,
-      note: "Reached Strong financial profile",
-    },
-    {
-      score: 600,
-      note: "Reached Good financial profile",
-    },
-    {
-      score: 500,
-      note: "Reached Fair financial profile",
-    },
-    {
-      score: 400,
-      note: "Reached Developing financial profile",
-    },
-  ];
+    [800, "Reached Excellent financial profile"],
+    [700, "Reached Strong financial profile"],
+    [600, "Reached Good financial profile"],
+    [500, "Reached Fair financial profile"],
+    [400, "Reached Developing financial profile"],
+  ] as const;
 
-  for (const threshold of thresholds) {
+  for (const [threshold, note] of thresholds) {
     if (
-      previousScore < threshold.score &&
-      currentScore >= threshold.score
+      previousScore < threshold &&
+      currentScore >= threshold
     ) {
-      return threshold.note;
+      return note;
     }
   }
 
   return null;
 }
 
-export default function ScoreHistoryPage({ navigate }: Props) {
-  const [filter, setFilter] = useState("6 months");
-  const [history, setHistory] = useState<ScoreHistoryItem[]>([]);
-  const [profile, setProfile] = useState<TrustProfile | null>(null);
+function CustomTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{
+    value?: number;
+    payload?: ChartPoint;
+  }>;
+}) {
+  if (!active || !payload?.length) return null;
 
+  return (
+    <div className="bg-white border border-[#E2EAF2] rounded-xl px-4 py-3 shadow-lg">
+      <p className="text-xs text-[#64748B] mb-1">
+        {payload[0]?.payload?.date}
+      </p>
+
+      <p className="text-lg font-bold text-[#0D2D52]">
+        {payload[0]?.value}
+      </p>
+
+      <p className="text-xs text-[#94A3B8]">
+        TrustID Score
+      </p>
+    </div>
+  );
+}
+
+export default function ScoreHistoryPage({
+  navigate,
+}: Props) {
+  const [filter, setFilter] = useState("6 months");
+  const [history, setHistory] = useState<ScoreHistoryItem[]>(
+    []
+  );
+  const [profile, setProfile] = useState<TrustProfile | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -161,13 +166,13 @@ export default function ScoreHistoryPage({ navigate }: Props) {
         setHistory(historyData || []);
         setProfile(profileData);
       } catch (err) {
-        if (!mounted) return;
-
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load your score history."
-        );
+        if (mounted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load your score history."
+          );
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -193,11 +198,6 @@ export default function ScoreHistoryPage({ navigate }: Props) {
       (item) => new Date(item.createdAt) >= startDate
     );
 
-    /*
-     * Always include the latest score so the user can see
-     * their current position even if the selected period
-     * has no recent recalculation.
-     */
     const latest = history[history.length - 1];
 
     if (
@@ -236,52 +236,32 @@ export default function ScoreHistoryPage({ navigate }: Props) {
 
   const milestoneRows = useMemo(() => {
     return history
-      .map((item, index) => {
-        const previous =
-          index > 0 ? history[index - 1].score : null;
-
-        return {
-          ...item,
-          milestone: getMilestoneNote(previous, item.score),
-        };
-      })
+      .map((item, index) => ({
+        ...item,
+        milestone: getMilestoneNote(
+          index > 0 ? history[index - 1].score : null,
+          item.score
+        ),
+      }))
       .filter((item) => item.milestone);
   }, [history]);
 
   if (loading) {
     return (
       <CustomerLayout current="score-history" navigate={navigate}>
-        <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8">
-          <div className="mb-8">
-            <div className="h-3 w-24 bg-[#E2EAF2] rounded animate-pulse mb-2" />
-            <div className="h-8 w-64 bg-[#E2EAF2] rounded animate-pulse" />
-            <div className="h-4 w-96 max-w-full bg-[#E2EAF2] rounded animate-pulse mt-3" />
-          </div>
+        <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8 space-y-5 animate-pulse">
+          <div className="h-8 w-64 bg-[#E2EAF2] rounded" />
 
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-3 gap-4">
             {[1, 2, 3].map((item) => (
-              <Card key={item} className="text-center">
-                <div className="h-3 w-16 bg-[#E2EAF2] rounded mx-auto mb-3 animate-pulse" />
-                <div className="h-8 w-16 bg-[#E2EAF2] rounded mx-auto animate-pulse" />
+              <Card key={item}>
+                <div className="h-16 bg-[#F8FAFB] rounded" />
               </Card>
             ))}
           </div>
 
-          <Card className="mb-6">
-            <div className="h-64 bg-[#F8FAFB] rounded-xl animate-pulse" />
-          </Card>
-
           <Card>
-            <div className="h-6 w-40 bg-[#E2EAF2] rounded animate-pulse mb-5" />
-
-            <div className="space-y-4">
-              {[1, 2, 3, 4].map((item) => (
-                <div
-                  key={item}
-                  className="h-8 bg-[#F8FAFB] rounded animate-pulse"
-                />
-              ))}
-            </div>
+            <div className="h-72 bg-[#F8FAFB] rounded-xl" />
           </Card>
         </div>
       </CustomerLayout>
@@ -291,35 +271,20 @@ export default function ScoreHistoryPage({ navigate }: Props) {
   if (error) {
     return (
       <CustomerLayout current="score-history" navigate={navigate}>
-        <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8">
+        <div className="max-w-3xl mx-auto px-5 sm:px-8 py-10">
           <Card className="text-center py-12">
-            <div className="h-12 w-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-              <svg
-                className="h-6 w-6 text-red-500"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-              >
-                <path
-                  d="M12 8v4M12 16h.01"
-                  strokeLinecap="round"
-                />
-                <circle cx="12" cy="12" r="9" />
-              </svg>
-            </div>
-
             <h2 className="text-lg font-bold text-[#0D1F35]">
               Unable to load score history
             </h2>
 
-            <p className="text-sm text-[#64748B] mt-2 max-w-md mx-auto">
+            <p className="text-sm text-[#64748B] mt-2">
               {error}
             </p>
 
             <button
+              type="button"
               onClick={() => window.location.reload()}
-              className="mt-6 px-5 py-2.5 rounded-xl bg-[#0D2D52] text-white text-sm font-semibold hover:bg-[#163D68] transition-colors"
+              className="mt-6 rounded-xl bg-[#0D2D52] px-5 py-3 text-sm font-semibold text-white"
             >
               Try Again
             </button>
@@ -332,27 +297,9 @@ export default function ScoreHistoryPage({ navigate }: Props) {
   if (!profile || !history.length) {
     return (
       <CustomerLayout current="score-history" navigate={navigate}>
-        <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8">
+        <div className="max-w-3xl mx-auto px-5 sm:px-8 py-10">
           <Card className="text-center py-12">
-            <div className="h-14 w-14 rounded-2xl bg-[#EFF4F9] flex items-center justify-center mx-auto mb-5">
-              <svg
-                className="h-7 w-7 text-[#0D2D52]"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path
-                  d="M4 19V5M4 19h16"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M7 15l4-4 3 2 5-6"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-            </div>
+            <div className="text-3xl mb-4">📈</div>
 
             <h2 className="text-lg font-bold text-[#0D1F35]">
               Your score history isn't available yet
@@ -360,13 +307,14 @@ export default function ScoreHistoryPage({ navigate }: Props) {
 
             <p className="text-sm text-[#64748B] mt-2 max-w-md mx-auto">
               Complete your financial analysis first. Once your
-              TrustID Score is generated, you'll be able to track
-              how it changes over time.
+              TrustID Score is generated, you will be able to
+              track how it changes over time.
             </p>
 
             <button
+              type="button"
               onClick={() => navigate("connect")}
-              className="mt-6 px-5 py-2.5 rounded-xl bg-[#0D2D52] text-white text-sm font-semibold hover:bg-[#163D68] transition-colors"
+              className="mt-6 rounded-xl bg-[#0D2D52] px-5 py-3 text-sm font-semibold text-white"
             >
               Start Analysis
             </button>
@@ -379,13 +327,20 @@ export default function ScoreHistoryPage({ navigate }: Props) {
   return (
     <CustomerLayout current="score-history" navigate={navigate}>
       <div className="max-w-3xl mx-auto px-5 sm:px-8 py-8">
-        {/* Header */}
         <div className="mb-8">
-          <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-widest mb-1">
+          <button
+            type="button"
+            onClick={() => navigate("dashboard")}
+            className="text-sm text-[#64748B] hover:text-[#0D2D52]"
+          >
+            ← Back to dashboard
+          </button>
+
+          <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-widest mt-6">
             Score History
           </p>
 
-          <h1 className="text-2xl font-bold text-[#0D1F35] tracking-tight">
+          <h1 className="text-2xl font-bold text-[#0D1F35] mt-1">
             Your Score Over Time
           </h1>
 
@@ -395,40 +350,39 @@ export default function ScoreHistoryPage({ navigate }: Props) {
           </p>
         </div>
 
-        {/* Score summary */}
         <div className="grid grid-cols-3 gap-4 mb-6">
           <Card className="text-center">
-            <p className="text-xs text-[#64748B] uppercase tracking-wide font-medium mb-1">
+            <p className="text-xs text-[#64748B] uppercase tracking-wide">
               Current
             </p>
 
-            <p className="text-2xl font-bold text-[#0D1F35] font-['JetBrains_Mono',monospace]">
+            <p className="text-2xl font-bold text-[#0D1F35] mt-1">
               {currentScore}
             </p>
           </Card>
 
           <Card className="text-center">
-            <p className="text-xs text-[#64748B] uppercase tracking-wide font-medium mb-1">
+            <p className="text-xs text-[#64748B] uppercase tracking-wide">
               Previous
             </p>
 
-            <p className="text-2xl font-bold text-[#0D1F35] font-['JetBrains_Mono',monospace]">
+            <p className="text-2xl font-bold text-[#0D1F35] mt-1">
               {previousScore ?? "—"}
             </p>
           </Card>
 
           <Card className="text-center">
-            <p className="text-xs text-[#64748B] uppercase tracking-wide font-medium mb-1">
+            <p className="text-xs text-[#64748B] uppercase tracking-wide">
               Change
             </p>
 
             <p
-              className={`text-2xl font-bold font-['JetBrains_Mono',monospace] ${
+              className={`text-2xl font-bold mt-1 ${
                 currentChange > 0
                   ? "text-[#10B981]"
                   : currentChange < 0
-                    ? "text-red-500"
-                    : "text-[#64748B]"
+                  ? "text-red-500"
+                  : "text-[#64748B]"
               }`}
             >
               {currentChange > 0 ? "+" : ""}
@@ -437,46 +391,43 @@ export default function ScoreHistoryPage({ navigate }: Props) {
           </Card>
         </div>
 
-        {/* Chart */}
         <Card className="mb-6">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-            <p className="text-sm font-bold text-[#0D1F35]">
-              Score Progression
-            </p>
+            <div>
+              <p className="text-sm font-bold text-[#0D1F35]">
+                Score Progression
+              </p>
+
+              <p className="text-xs text-[#94A3B8] mt-1">
+                Your TrustID Score over the selected period
+              </p>
+            </div>
 
             <div className="flex gap-1.5 flex-wrap">
-              {filters.map((f) => (
+              {filters.map((item) => (
                 <button
-                  key={f}
-                  onClick={() => setFilter(f)}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all ${
-                    filter === f
+                  type="button"
+                  key={item}
+                  onClick={() => setFilter(item)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold ${
+                    filter === item
                       ? "bg-[#0D2D52] text-white"
-                      : "bg-[#F8FAFB] text-[#64748B] hover:bg-[#EFF4F9] border border-[#E2EAF2]"
+                      : "bg-[#F8FAFB] text-[#64748B] border border-[#E2EAF2]"
                   }`}
                 >
-                  {f}
+                  {item}
                 </button>
               ))}
             </div>
           </div>
 
           {chartData.length > 0 ? (
-            <div className="h-56">
+            <div className="h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <LineChart
-                  data={chartData}
-                  margin={{
-                    top: 5,
-                    right: 10,
-                    left: -20,
-                    bottom: 5,
-                  }}
-                >
+                <LineChart data={chartData}>
                   <CartesianGrid
                     strokeDasharray="3 3"
-                    stroke="#F1F5F9"
-                    vertical={false}
+                    stroke="#E2EAF2"
                   />
 
                   <XAxis
@@ -484,10 +435,7 @@ export default function ScoreHistoryPage({ navigate }: Props) {
                     tick={{
                       fontSize: 11,
                       fill: "#94A3B8",
-                      fontFamily: "DM Sans",
                     }}
-                    axisLine={false}
-                    tickLine={false}
                   />
 
                   <YAxis
@@ -495,17 +443,14 @@ export default function ScoreHistoryPage({ navigate }: Props) {
                     tick={{
                       fontSize: 11,
                       fill: "#94A3B8",
-                      fontFamily: "JetBrains Mono",
                     }}
-                    axisLine={false}
-                    tickLine={false}
                   />
 
                   <Tooltip content={<CustomTooltip />} />
 
                   <ReferenceLine
                     y={700}
-                    stroke="#E2EAF2"
+                    stroke="#D7E5F2"
                     strokeDasharray="4 4"
                   />
 
@@ -513,152 +458,112 @@ export default function ScoreHistoryPage({ navigate }: Props) {
                     type="monotone"
                     dataKey="score"
                     stroke="#0D2D52"
-                    strokeWidth={2.5}
+                    strokeWidth={3}
                     dot={{
-                      fill: "#0D2D52",
                       r: 4,
-                      strokeWidth: 0,
+                      fill: "#0D2D52",
                     }}
                     activeDot={{
-                      fill: "#10B981",
                       r: 6,
-                      strokeWidth: 0,
                     }}
                   />
                 </LineChart>
               </ResponsiveContainer>
             </div>
           ) : (
-            <div className="h-56 flex items-center justify-center">
-              <p className="text-sm text-[#94A3B8]">
-                No score updates were recorded during this period.
+            <div className="py-12 text-center">
+              <p className="text-sm text-[#64748B]">
+                No scores were recorded during this period.
               </p>
             </div>
           )}
-
-          <p className="text-xs text-[#94A3B8] text-center mt-2">
-            700 threshold line shown for reference
-          </p>
         </Card>
 
-        {/* Score breakdown */}
         <Card className="mb-6">
-          <p className="text-sm font-bold text-[#0D1F35] mb-4">
-            Score Updates
-          </p>
+          <h2 className="text-sm font-bold text-[#0D1F35] mb-5">
+            Score Records
+          </h2>
 
-          <div className="space-y-0">
-            {[...filteredHistory]
+          <div className="divide-y divide-[#E2EAF2]">
+            {filteredHistory
+              .slice()
               .reverse()
-              .map((row, reverseIndex) => {
-                const originalIndex = history.findIndex(
-                  (item) => item._id === row._id
-                );
-
-                const previous =
-                  originalIndex > 0
-                    ? history[originalIndex - 1].score
-                    : null;
-
-                const diff =
-                  row.change ??
-                  (previous !== null
-                    ? row.score - previous
-                    : 0);
-
-                const milestone = getMilestoneNote(
-                  previous,
-                  row.score
-                );
-
-                return (
-                  <div
-                    key={row._id}
-                    className={`flex items-center gap-4 py-3 ${
-                      reverseIndex <
-                      filteredHistory.length - 1
-                        ? "border-b border-[#F1F5F9]"
-                        : ""
-                    }`}
-                  >
-                    <div className="w-20 shrink-0">
-                      <p className="text-sm font-semibold text-[#64748B]">
-                        {formatMonth(row.createdAt)}
-                      </p>
-
-                      <p className="text-[10px] text-[#94A3B8]">
-                        {formatDate(row.createdAt)}
-                      </p>
-                    </div>
-
-                    <p className="text-sm font-bold text-[#0D1F35] font-['JetBrains_Mono',monospace] w-10">
-                      {row.score}
+              .map((item, index) => (
+                <div
+                  key={
+                    item._id ||
+                    `${item.createdAt}-${index}`
+                  }
+                  className="py-4 flex items-center justify-between gap-4"
+                >
+                  <div>
+                    <p className="text-sm font-semibold text-[#0D1F35]">
+                      {item.score} / 850
                     </p>
 
-                    <div className="flex-1 min-w-0">
-                      {milestone ? (
-                        <span className="inline-flex items-center gap-1 text-xs bg-[#EFF4F9] text-[#0D2D52] border border-[#C8D9EC] px-2 py-0.5 rounded-full font-medium">
-                          🏅 {milestone}
-                        </span>
-                      ) : (
-                        <p className="text-xs text-[#94A3B8] truncate">
-                          {row.reason}
-                        </p>
-                      )}
-                    </div>
+                    <p className="text-xs text-[#64748B] mt-1">
+                      {formatDate(item.createdAt)}
+                    </p>
+                  </div>
 
-                    <span
-                      className={`text-xs font-bold font-['JetBrains_Mono',monospace] ${
-                        diff > 0
-                          ? "text-[#10B981]"
-                          : diff < 0
-                            ? "text-red-500"
-                            : "text-[#94A3B8]"
+                  <div className="text-right">
+                    <p className="text-xs font-semibold text-[#64748B]">
+                      {profile.band}
+                    </p>
+
+                    <p
+                      className={`text-xs mt-1 ${
+                        item.change > 0
+                          ? "text-emerald-600"
+                          : item.change < 0
+                          ? "text-red-500"
+                          : "text-[#94A3B8]"
                       }`}
                     >
-                      {diff > 0 ? "+" : ""}
-                      {diff}
-                    </span>
+                      {item.change > 0 ? "+" : ""}
+                      {item.change} pts
+                    </p>
                   </div>
-                );
-              })}
+                </div>
+              ))}
           </div>
         </Card>
 
-        {/* Milestones */}
         {milestoneRows.length > 0 && (
           <Card>
-            <p className="text-sm font-bold text-[#0D1F35] mb-4">
-              Score Milestones
-            </p>
+            <h2 className="text-sm font-bold text-[#0D1F35] mb-4">
+              Milestones
+            </h2>
 
             <div className="space-y-3">
-              {[...milestoneRows]
-                .reverse()
-                .map((milestone) => (
-                  <div
-                    key={milestone._id}
-                    className="flex items-center gap-3"
-                  >
-                    <div className="h-8 w-8 rounded-full bg-[#EFF4F9] flex items-center justify-center text-sm">
-                      🏅
-                    </div>
+              {milestoneRows.map((item, index) => (
+                <div
+                  key={
+                    item._id ||
+                    `${item.createdAt}-milestone-${index}`
+                  }
+                  className="rounded-xl bg-[#F3F8FC] border border-[#D7E5F2] p-4"
+                >
+                  <p className="text-sm font-semibold text-[#0D2D52]">
+                    {item.milestone}
+                  </p>
 
-                    <div>
-                      <p className="text-sm font-semibold text-[#0D1F35]">
-                        {milestone.milestone}
-                      </p>
-
-                      <p className="text-xs text-[#94A3B8]">
-                        {formatDate(milestone.createdAt)} ·
-                        Score reached {milestone.score}
-                      </p>
-                    </div>
-                  </div>
-                ))}
+                  <p className="text-xs text-[#64748B] mt-1">
+                    Score: {item.score} ·{" "}
+                    {formatDate(item.createdAt)}
+                  </p>
+                </div>
+              ))}
             </div>
           </Card>
         )}
+
+        <div className="mt-6 text-center">
+          <p className="text-xs text-[#94A3B8]">
+            TrustID provides an explainable view of financial
+            behaviour. It is not a lending decision.
+          </p>
+        </div>
       </div>
     </CustomerLayout>
   );

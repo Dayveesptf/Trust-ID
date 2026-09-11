@@ -1,75 +1,158 @@
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
+
 import { Button } from "../components/ui";
 import logotext from "../assets/logo-nav-dark.png";
+
 import { generateTrustProfile } from "../services/financialProfileService";
 
 interface Props {
-  navigate: (s: string) => void;
+  navigate: (screen: string) => void;
 }
 
 const stages = [
-  { id: 1, label: "Income consistency", duration: 1200 },
-  { id: 2, label: "Savings behaviour", duration: 1800 },
-  { id: 3, label: "Repayment behaviour", duration: 2600 },
-  { id: 4, label: "Cash-flow stability", duration: 3400 },
-  { id: 5, label: "Financial discipline", duration: 4200 },
+  {
+    id: 1,
+    label: "Income consistency",
+    duration: 1200,
+  },
+  {
+    id: 2,
+    label: "Savings behaviour",
+    duration: 1800,
+  },
+  {
+    id: 3,
+    label: "Repayment behaviour",
+    duration: 2600,
+  },
+  {
+    id: 4,
+    label: "Cash-flow stability",
+    duration: 3400,
+  },
+  {
+    id: 5,
+    label: "Financial discipline",
+    duration: 4200,
+  },
 ];
 
-export default function AnalysisPage({ navigate }: Props) {
+const ANALYSIS_DURATION = 5200;
+
+export default function AnalysisPage({
+  navigate,
+}: Props) {
   const [elapsed, setElapsed] = useState(0);
   const [done, setDone] = useState(false);
+
   const [generating, setGenerating] = useState(false);
-  const [score, setScore] = useState<number | null>(null);
-  const [band, setBand] = useState<string>("");
+
+  const [score, setScore] = useState<number | null>(
+    null
+  );
+
+  const [band, setBand] = useState("");
+
   const [error, setError] = useState("");
 
+  /* ------------------------------------------------------------------------ */
+  /* Simulated analysis progress                                             */
+  /* ------------------------------------------------------------------------ */
+
   useEffect(() => {
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+
     const interval = setInterval(() => {
       setElapsed((current) => {
         const next = current + 100;
 
-        if (next >= 5500) {
+        if (next >= ANALYSIS_DURATION) {
           clearInterval(interval);
 
-          setTimeout(() => {
+          timeout = setTimeout(() => {
             setDone(true);
-          }, 600);
+          }, 500);
 
-          return 5500;
+          return ANALYSIS_DURATION;
         }
 
         return next;
       });
     }, 100);
 
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+
+      if (timeout) {
+        clearTimeout(timeout);
+      }
+    };
   }, []);
 
-  useEffect(() => {
-    if (!done || score !== null || generating) return;
+  /* ------------------------------------------------------------------------ */
+  /* Generate actual TrustID score                                           */
+  /* ------------------------------------------------------------------------ */
 
-    const createProfile = async () => {
+  useEffect(() => {
+    if (!done || generating || score !== null) {
+      return;
+    }
+
+    let mounted = true;
+
+    const createTrustProfile = async () => {
       setGenerating(true);
       setError("");
 
       try {
         const response = await generateTrustProfile();
 
+        if (!mounted) {
+          return;
+        }
+
         setScore(response.profile.totalScore);
         setBand(response.profile.band);
       } catch (err) {
+        if (!mounted) {
+          return;
+        }
+
         setError(
           err instanceof Error
             ? err.message
             : "We couldn't generate your Trust Profile."
         );
       } finally {
-        setGenerating(false);
+        if (mounted) {
+          setGenerating(false);
+        }
       }
     };
 
-    createProfile();
-  }, [done, score, generating]);
+    createTrustProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, [done, generating, score]);
+
+  /* ------------------------------------------------------------------------ */
+  /* Retry                                                                    */
+  /* ------------------------------------------------------------------------ */
+
+  const handleRetry = () => {
+    setElapsed(0);
+    setDone(false);
+    setGenerating(false);
+    setScore(null);
+    setBand("");
+    setError("");
+  };
+
+  /* ------------------------------------------------------------------------ */
+  /* Analysis progress                                                        */
+  /* ------------------------------------------------------------------------ */
 
   const completedStages = stages.filter(
     (stage) => elapsed >= stage.duration
@@ -77,7 +160,9 @@ export default function AnalysisPage({ navigate }: Props) {
 
   const activeStage = stages.find((stage) => {
     const previousDuration =
-      stages.find((item) => item.id === stage.id - 1)?.duration ?? 0;
+      stages.find(
+        (item) => item.id === stage.id - 1
+      )?.duration ?? 0;
 
     return (
       elapsed < stage.duration &&
@@ -85,13 +170,21 @@ export default function AnalysisPage({ navigate }: Props) {
     );
   });
 
-  const overallPct = Math.min((elapsed / 5200) * 100, 100);
+  const overallPct = Math.min(
+    (elapsed / ANALYSIS_DURATION) * 100,
+    100
+  );
+
+  /* ------------------------------------------------------------------------ */
+  /* Render                                                                   */
+  /* ------------------------------------------------------------------------ */
 
   return (
     <div className="min-h-screen bg-[#0D2D52] flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-md text-center animate-fade-in">
+
         {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-12">
+        <div className="flex items-center justify-center mb-12">
           <img
             src={logotext}
             alt="TrustID"
@@ -99,9 +192,14 @@ export default function AnalysisPage({ navigate }: Props) {
           />
         </div>
 
+        {/* ---------------------------------------------------------------- */}
+        {/* COMPLETE                                                           */}
+        {/* ---------------------------------------------------------------- */}
+
         {done ? (
-          /* Completion state */
           <div className="animate-fade-in-up">
+
+            {/* Generating score */}
             {generating ? (
               <>
                 <div className="h-20 w-20 rounded-full border-4 border-white/10 border-t-[#10B981] animate-spin mx-auto mb-6" />
@@ -111,12 +209,13 @@ export default function AnalysisPage({ navigate }: Props) {
                 </h1>
 
                 <p className="text-white/60 text-sm leading-relaxed">
-                  We're combining the five behavioural dimensions into your
-                  Trust Profile.
+                  We're combining the five behavioural
+                  dimensions into your Trust Profile.
                 </p>
               </>
             ) : error ? (
               <>
+                {/* Error icon */}
                 <div className="h-20 w-20 rounded-full bg-red-500/10 border border-red-400/20 flex items-center justify-center mx-auto mb-6">
                   <svg
                     className="h-9 w-9 text-red-300"
@@ -129,6 +228,7 @@ export default function AnalysisPage({ navigate }: Props) {
                       strokeWidth="3"
                       strokeLinecap="round"
                     />
+
                     <circle
                       cx="20"
                       cy="20"
@@ -148,15 +248,24 @@ export default function AnalysisPage({ navigate }: Props) {
                 </p>
 
                 <Button
-                  onClick={() => navigate("connect")}
+                  onClick={handleRetry}
                   size="lg"
                   className="w-full !bg-white !text-[#0D2D52] hover:!bg-white/90"
                 >
-                  Try Again →
+                  Try Again
                 </Button>
+
+                <button
+                  type="button"
+                  onClick={() => navigate("connect")}
+                  className="mt-4 text-sm text-white/50 hover:text-white transition-colors"
+                >
+                  Back to financial profile
+                </button>
               </>
             ) : (
               <>
+                {/* Success icon */}
                 <div className="h-20 w-20 rounded-full bg-[#10B981] flex items-center justify-center mx-auto mb-6 animate-check-in">
                   <svg
                     className="h-10 w-10 text-white"
@@ -178,38 +287,42 @@ export default function AnalysisPage({ navigate }: Props) {
                 </h1>
 
                 <p className="text-white/60 text-sm mb-8 leading-relaxed">
-                  We've analysed 7 months of financial behaviour across five
-                  key dimensions. Your TrustID Score has been calculated.
+                  We've analysed your financial behaviour
+                  across five key dimensions. Your TrustID
+                  Score has been calculated.
                 </p>
 
+                {/* Result cards */}
                 <div className="grid grid-cols-3 gap-3 mb-8">
-                  {[
-                    {
-                      label: "Overall Score",
-                      value: `${score ?? 0}/850`,
-                    },
-                    {
-                      label: "Profile Level",
-                      value: band || "—",
-                    },
-                    {
-                      label: "Factors",
-                      value: "5/5",
-                    },
-                  ].map(({ label, value }) => (
-                    <div
-                      key={label}
-                      className="bg-white/5 border border-white/10 rounded-xl p-3"
-                    >
-                      <p className="text-white font-bold text-sm font-['JetBrains_Mono',monospace]">
-                        {value}
-                      </p>
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <p className="text-white font-bold text-sm font-['JetBrains_Mono',monospace]">
+                      {score ?? 0}/850
+                    </p>
 
-                      <p className="text-white/50 text-xs mt-0.5">
-                        {label}
-                      </p>
-                    </div>
-                  ))}
+                    <p className="text-white/50 text-xs mt-0.5">
+                      Overall Score
+                    </p>
+                  </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <p className="text-white font-bold text-sm">
+                      {band || "—"}
+                    </p>
+
+                    <p className="text-white/50 text-xs mt-0.5">
+                      Profile Level
+                    </p>
+                  </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-3">
+                    <p className="text-white font-bold text-sm font-['JetBrains_Mono',monospace]">
+                      5/5
+                    </p>
+
+                    <p className="text-white/50 text-xs mt-0.5">
+                      Factors
+                    </p>
+                  </div>
                 </div>
 
                 <Button
@@ -223,9 +336,13 @@ export default function AnalysisPage({ navigate }: Props) {
             )}
           </div>
         ) : (
-          /* Analysis in progress */
+          /* ---------------------------------------------------------------- */
+          /* ANALYSIS IN PROGRESS                                             */
+          /* ---------------------------------------------------------------- */
+
           <div>
-            {/* Score ring placeholder */}
+
+            {/* Progress ring */}
             <div className="relative h-40 w-40 mx-auto mb-10">
               <svg
                 viewBox="0 0 160 160"
@@ -248,9 +365,12 @@ export default function AnalysisPage({ navigate }: Props) {
                   stroke="#10B981"
                   strokeWidth="10"
                   strokeLinecap="round"
-                  strokeDasharray={`${(overallPct / 100) * 402} 402`}
+                  strokeDasharray={`${
+                    (overallPct / 100) * 402
+                  } 402`}
                   style={{
-                    transition: "stroke-dasharray 0.3s ease",
+                    transition:
+                      "stroke-dasharray 0.3s ease",
                   }}
                 />
               </svg>
@@ -271,16 +391,19 @@ export default function AnalysisPage({ navigate }: Props) {
             </h1>
 
             <p className="text-white/60 text-sm mb-10 leading-relaxed max-w-sm mx-auto">
-              We're analysing your financial behaviour to understand your
-              financial strengths and opportunities.
+              We're analysing your financial behaviour to
+              understand your financial strengths and
+              opportunities.
             </p>
 
-            {/* Stages */}
+            {/* Analysis stages */}
             <div className="space-y-3 text-left mb-8">
               {stages.map((stage) => {
-                const isComplete = completedStages.some(
-                  (completed) => completed.id === stage.id
-                );
+                const isComplete =
+                  completedStages.some(
+                    (completed) =>
+                      completed.id === stage.id
+                  );
 
                 const isActive =
                   activeStage?.id === stage.id;
@@ -299,34 +422,36 @@ export default function AnalysisPage({ navigate }: Props) {
                     <div
                       className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 transition-all duration-300 ${
                         isComplete
-                          ? "bg-[#10B981] animate-check-in"
+                          ? "bg-[#10B981]"
                           : isActive
-                          ? "bg-white/20 animate-pulse-slow"
-                          : "bg-white/10"
+                          ? "border-2 border-[#10B981]"
+                          : "border border-white/20"
                       }`}
                     >
                       {isComplete ? (
                         <svg
-                          className="h-4 w-4 text-white"
-                          viewBox="0 0 14 14"
+                          className="h-3.5 w-3.5 text-white"
+                          viewBox="0 0 16 16"
                           fill="none"
                         >
                           <path
-                            d="M2.5 7l3 3.5 6-6"
+                            d="M3 8l3 3 7-7"
                             stroke="currentColor"
-                            strokeWidth="1.5"
+                            strokeWidth="2"
                             strokeLinecap="round"
                             strokeLinejoin="round"
                           />
                         </svg>
                       ) : isActive ? (
-                        <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                        <div className="h-2 w-2 rounded-full bg-[#10B981] animate-pulse" />
                       ) : (
-                        <div className="h-2 w-2 rounded-full bg-white/20" />
+                        <span className="text-[10px] text-white/30">
+                          {stage.id}
+                        </span>
                       )}
                     </div>
 
-                    <span
+                    <p
                       className={`text-sm font-medium ${
                         isComplete
                           ? "text-white"
@@ -335,19 +460,18 @@ export default function AnalysisPage({ navigate }: Props) {
                           : "text-white/40"
                       }`}
                     >
-                      {stage.label.charAt(0).toUpperCase() +
-                        stage.label.slice(1)}
-                    </span>
+                      {stage.label}
+                    </p>
 
-                    {isActive && (
-                      <span className="ml-auto text-xs text-white/40 animate-pulse-slow">
-                        Analysing…
+                    {isComplete && (
+                      <span className="ml-auto text-xs text-emerald-300">
+                        Complete
                       </span>
                     )}
 
-                    {isComplete && (
-                      <span className="ml-auto text-xs text-emerald-400 font-semibold">
-                        Done
+                    {isActive && (
+                      <span className="ml-auto text-xs text-white/50">
+                        Analysing…
                       </span>
                     )}
                   </div>
@@ -355,13 +479,10 @@ export default function AnalysisPage({ navigate }: Props) {
               })}
             </div>
 
-            {/* Overall progress bar */}
-            <div className="h-1 w-full bg-white/10 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-[#10B981] rounded-full transition-all duration-300"
-                style={{ width: `${overallPct}%` }}
-              />
-            </div>
+            <p className="text-white/30 text-xs">
+              This is a simulated analysis for the
+              competition prototype.
+            </p>
           </div>
         )}
       </div>

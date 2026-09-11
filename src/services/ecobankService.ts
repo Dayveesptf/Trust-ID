@@ -8,6 +8,7 @@ export interface EcobankCustomer {
   phone: string;
   createdAt?: string;
   onboardingCompleted: boolean;
+
   trustProfile: {
     score: number;
     band: string;
@@ -24,6 +25,7 @@ export interface CustomerTrustFactor {
 export interface EcobankTrustProfile {
   _id: string;
   userId: string;
+
   totalScore: number;
   band: string;
 
@@ -48,6 +50,14 @@ export interface EcobankTrustProfile {
   generatedAt: string;
 }
 
+export interface EcobankFinancialEvidence {
+  averageMonthlyInflow: number;
+  averageMonthlySavings: number;
+  repaymentOnTimeRate: number;
+  savingsRate: number;
+  cashFlowStability: number;
+}
+
 export interface EcobankCustomerDetail {
   customer: {
     _id: string;
@@ -61,13 +71,7 @@ export interface EcobankCustomerDetail {
 
   trustProfile: EcobankTrustProfile | null;
 
-  financialEvidence: {
-    averageMonthlyInflow: number;
-    averageMonthlySavings: number;
-    repaymentOnTimeRate: number;
-    savingsRate: number;
-    cashFlowStability: number;
-  } | null;
+  financialEvidence: EcobankFinancialEvidence | null;
 
   decisionNotice: string;
 }
@@ -94,8 +98,12 @@ export async function getEcobankCustomers(): Promise<
 export async function getEcobankCustomer(
   customerId: string
 ): Promise<EcobankCustomerDetail> {
+  if (!customerId) {
+    throw new Error("Customer ID is required.");
+  }
+
   return apiRequest<EcobankCustomerDetail>(
-    `/ecobank/customers/${customerId}`
+    `/ecobank/customers/${encodeURIComponent(customerId)}`
   );
 }
 

@@ -1,366 +1,390 @@
-import { useState } from "react";
-
-import { Button } from "../components/ui";
-import { useAuth } from "../context/AuthContext";
-import { saveOnboarding } from "../services/onboardingService";
-
-import logotext from "../assets/logo-nav-light.png";
+import { useEffect, useState } from "react";
+import { CustomerLayout } from "../components/Layout";
+import {
+  Badge,
+  Button,
+  Card,
+} from "../components/ui";
+import {
+  getEcobankOpportunities,
+  type EcobankOpportunity,
+} from "../services/ecobankService";
+import {
+  getTrustProfile,
+  type TrustProfile,
+} from "../services/financialProfileService";
 
 interface Props {
-  navigate: (s: string) => void;
+  navigate: (page: string) => void;
 }
 
-const steps = [
-  {
-    step: 1,
-    title: "What is your primary source of income?",
-    subtitle:
-      "This helps us understand your income pattern and regularity.",
-    field: "income",
-    options: [
-      "Salary",
-      "Business",
-      "Freelancing",
-      "Contract Work",
-      "Other",
-    ],
-  },
-  {
-    step: 2,
-    title: "How frequently do you receive income?",
-    subtitle:
-      "Knowing your payment cycle helps us interpret your cash-flow behaviour accurately.",
-    field: "frequency",
-    options: [
-      "Daily",
-      "Weekly",
-      "Monthly",
-      "Irregularly",
-    ],
-  },
-  {
-    step: 3,
-    title: "What are your financial goals?",
-    subtitle:
-      "Your goals help us tailor recommendations to what matters most to you.",
-    field: "goals",
-    options: [
-      "Save more",
-      "Manage spending",
-      "Build financial credibility",
-      "Access financial products",
-      "Improve financial discipline",
-    ],
-    multi: true,
-  },
-];
+function getBandVariant(
+  band: string
+): "success" | "good" | "fair" | "warning" | "info" | "neutral" {
+  switch (band) {
+    case "Excellent":
+      return "success";
 
-const incomeSourceMap: Record<string, "salary" | "business" | "freelance" | "allowance" | "multiple" | "other"> = {
-  Salary: "salary",
-  Business: "business",
-  Freelancing: "freelance",
-  "Contract Work": "multiple",
-  Other: "other",
-};
+    case "Strong":
+    case "Good":
+      return "good";
 
-const incomeFrequencyMap: Record<
-  string,
-  "daily" | "weekly" | "monthly" | "irregular"
-> = {
-  Daily: "daily",
-  Weekly: "weekly",
-  Monthly: "monthly",
-  Irregularly: "irregular",
-};
+    case "Fair":
+      return "fair";
 
-const goalMap: Record<
-  string,
-  "save" | "access_credit" | "start_business" | "manage_spending" | "build_credibility"
-> = {
-  "Save more": "save",
-  "Manage spending": "manage_spending",
-  "Build financial credibility": "build_credibility",
-  "Access financial products": "access_credit",
-  "Improve financial discipline": "manage_spending",
-};
+    case "Developing":
+      return "warning";
 
-export default function OnboardingPage({ navigate }: Props) {
-  const { refreshUser } = useAuth();
+    default:
+      return "neutral";
+  }
+}
 
-  const [step, setStep] = useState(0);
+function getCategoryIcon(category: string) {
+  const value = category.toLowerCase();
 
-  const [answers, setAnswers] = useState<
-    Record<string, string | string[]>
-  >({
-    income: "",
-    frequency: "",
-    goals: [],
-  });
+  if (
+    value.includes("loan") ||
+    value.includes("credit")
+  ) {
+    return "💳";
+  }
 
-  const [saving, setSaving] = useState(false);
+  if (value.includes("saving")) {
+    return "💰";
+  }
+
+  if (value.includes("business")) {
+    return "🏪";
+  }
+
+  if (value.includes("account")) {
+    return "🏦";
+  }
+
+  if (value.includes("investment")) {
+    return "📈";
+  }
+
+  return "✨";
+}
+
+export default function OpportunityPage({
+  navigate,
+}: Props) {
+  const [profile, setProfile] = useState<TrustProfile | null>(
+    null
+  );
+
+  const [opportunities, setOpportunities] = useState<
+    EcobankOpportunity[]
+  >([]);
+
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  const current = steps[step];
+  useEffect(() => {
+    let mounted = true;
 
-  const value = answers[current.field];
+    async function loadOpportunities() {
+      try {
+        setLoading(true);
+        setError("");
 
-  const isMulti = current.multi;
+        const [profileData, opportunityData] =
+          await Promise.all([
+            getTrustProfile(),
+            getEcobankOpportunities(),
+          ]);
 
-  const canAdvance = isMulti
-    ? (value as string[]).length > 0
-    : (value as string).length > 0;
+        if (!mounted) return;
 
-  const select = (opt: string) => {
-    setError("");
-
-    if (isMulti) {
-      const arr = value as string[];
-
-      setAnswers((a) => ({
-        ...a,
-        [current.field]: arr.includes(opt)
-          ? arr.filter((x) => x !== opt)
-          : [...arr, opt],
-      }));
-    } else {
-      setAnswers((a) => ({
-        ...a,
-        [current.field]: opt,
-      }));
+        setProfile(profileData);
+        setOpportunities(opportunityData || []);
+      } catch (err) {
+        if (mounted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load Ecobank opportunities."
+          );
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
     }
-  };
 
-  const finishOnboarding = async () => {
-    const income = answers.income as string;
-    const frequency = answers.frequency as string;
-    const goals = answers.goals as string[];
+    loadOpportunities();
 
-    const payload = {
-      incomeSource: incomeSourceMap[income],
-      incomeFrequency: incomeFrequencyMap[frequency],
-      goals: goals.map((goal) => goalMap[goal]),
+    return () => {
+      mounted = false;
     };
+  }, []);
 
-    if (
-      !payload.incomeSource ||
-      !payload.incomeFrequency
-    ) {
-      setError(
-        "Please complete all required onboarding questions."
-      );
-      return;
-    }
+  if (loading) {
+    return (
+      <CustomerLayout
+        current="opportunity"
+        navigate={navigate}
+      >
+        <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-6 animate-pulse">
+          <div className="h-8 w-72 bg-slate-200 rounded" />
+          <div className="h-4 w-96 bg-slate-200 rounded" />
+          <div className="h-36 bg-slate-200 rounded-2xl" />
 
-    try {
-      setSaving(true);
-      setError("");
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <div className="h-64 bg-slate-200 rounded-2xl" />
+            <div className="h-64 bg-slate-200 rounded-2xl" />
+          </div>
+        </div>
+      </CustomerLayout>
+    );
+  }
 
-      await saveOnboarding(payload);
+  if (error) {
+    return (
+      <CustomerLayout
+        current="opportunity"
+        navigate={navigate}
+      >
+        <div className="p-6 lg:p-10 max-w-4xl mx-auto">
+          <Card className="p-8 text-center">
+            <div className="w-14 h-14 rounded-full bg-[#E8F0F7] flex items-center justify-center mx-auto mb-4 text-2xl">
+              🏦
+            </div>
 
-      /*
-       * The backend sets onboardingCompleted = true.
-       * Refresh the authenticated user so AuthContext
-       * immediately knows about that change.
-       */
-      await refreshUser();
+            <h1 className="text-xl font-semibold text-[#0D2D52]">
+              Ecobank Opportunities
+            </h1>
 
-      navigate("consent");
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to save your onboarding information."
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
+            <p className="text-sm text-slate-500 mt-2 mb-6">
+              {error}
+            </p>
 
-  const next = async () => {
-    if (!canAdvance || saving) {
-      return;
-    }
-
-    if (step < steps.length - 1) {
-      setStep((s) => s + 1);
-      return;
-    }
-
-    await finishOnboarding();
-  };
-
-  const progressPct =
-    ((step + 1) / steps.length) * 100;
+            <Button
+              onClick={() => navigate("dashboard")}
+            >
+              Back to Dashboard
+            </Button>
+          </Card>
+        </div>
+      </CustomerLayout>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFB] flex items-center justify-center px-6 py-12">
-      <div className="w-full max-w-lg animate-fade-in">
+    <CustomerLayout
+      current="opportunity"
+      navigate={navigate}
+    >
+      <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate("dashboard")}
+            className="text-sm text-[#64748B] hover:text-[#0D2D52]"
+          >
+            ← Back to dashboard
+          </button>
 
-        {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-2">
-            <img
-              src={logotext}
-              alt="TrustID"
-              className="h-7 w-auto"
-            />
-          </div>
-
-          <span className="text-xs font-semibold text-[#64748B] bg-white border border-[#E2EAF2] px-3 py-1.5 rounded-full">
-            Step {step + 1} of {steps.length}
-          </span>
-        </div>
-
-        {/* Progress */}
-        <div className="mb-8">
-          <div className="h-1.5 w-full bg-[#E2EAF2] rounded-full overflow-hidden">
-            <div
-              className="h-full bg-[#0D2D52] rounded-full transition-all duration-500"
-              style={{
-                width: `${progressPct}%`,
-              }}
-            />
-          </div>
-
-          <div className="flex mt-3 gap-2">
-            {steps.map((_, i) => (
-              <div
-                key={i}
-                className="flex items-center gap-2"
-              >
-                <div
-                  className={`h-2 w-2 rounded-full transition-colors ${
-                    i <= step
-                      ? "bg-[#0D2D52]"
-                      : "bg-[#E2EAF2]"
-                  }`}
-                />
-
-                {i < steps.length - 1 && (
-                  <div className="h-px w-6 bg-[#E2EAF2]" />
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Question card */}
-        <div className="bg-white rounded-2xl border border-[#E2EAF2] p-7 shadow-sm mb-6 animate-fade-in-up">
-
-          <div className="h-10 w-10 rounded-xl bg-[#EFF4F9] flex items-center justify-center mb-5">
-            <span className="text-[#0D2D52] font-bold text-sm font-['JetBrains_Mono',monospace]">
-              0{step + 1}
-            </span>
-          </div>
-
-          <h2 className="text-xl font-bold text-[#0D1F35] mb-2 tracking-tight">
-            {current.title}
-          </h2>
-
-          <p className="text-sm text-[#64748B] mb-6 leading-relaxed">
-            {current.subtitle}
+          <p className="text-sm font-medium text-[#2563A0] mt-6">
+            Ecobank Opportunities
           </p>
 
-          {isMulti && (
-            <p className="text-xs text-[#94A3B8] mb-3 font-medium">
-              Select all that apply
-            </p>
-          )}
+          <h1 className="text-2xl lg:text-3xl font-bold text-[#0D2D52] mt-1">
+            Opportunities matched to your profile
+          </h1>
 
-          <div className="flex flex-col gap-2.5">
-            {current.options.map((opt) => {
-              const selected = isMulti
-                ? (value as string[]).includes(opt)
-                : value === opt;
+          <p className="text-slate-500 mt-2 max-w-2xl">
+            Explore financial opportunities that may be
+            relevant to your current Trust Profile.
+          </p>
+        </div>
 
-              return (
-                <button
-                  key={opt}
-                  type="button"
-                  onClick={() => select(opt)}
-                  className={`
-                    w-full text-left px-4 py-3.5 rounded-xl border-2 transition-all duration-150 text-sm font-medium flex items-center gap-3
-                    ${
-                      selected
-                        ? "border-[#0D2D52] bg-[#EFF4F9] text-[#0D2D52]"
-                        : "border-[#E2EAF2] bg-[#F8FAFB] text-[#374151] hover:border-[#A9C0DC] hover:bg-white"
-                    }
-                  `}
-                >
-                  <div
-                    className={`h-5 w-5 rounded-${
-                      isMulti ? "md" : "full"
-                    } border-2 flex items-center justify-center shrink-0 transition-all ${
-                      selected
-                        ? "border-[#0D2D52] bg-[#0D2D52]"
-                        : "border-[#CBD5E1]"
-                    }`}
+        {profile && (
+          <Card className="p-6 lg:p-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              <div>
+                <p className="text-sm text-slate-500">
+                  Your current Trust Profile
+                </p>
+
+                <div className="flex items-end gap-3 mt-2">
+                  <span className="text-4xl font-bold text-[#0D2D52]">
+                    {profile.totalScore}
+                  </span>
+
+                  <span className="text-slate-400 mb-1">
+                    / 850
+                  </span>
+
+                  <Badge
+                    variant={getBandVariant(profile.band)}
+                    size="md"
                   >
-                    {selected && (
-                      <svg
-                        className="w-3 h-3 text-white"
-                        viewBox="0 0 10 10"
-                        fill="none"
-                      >
-                        <path
-                          d="M2 5l2 2.5 4-4"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
+                    {profile.band}
+                  </Badge>
+                </div>
+              </div>
+
+              <div className="max-w-md">
+                <p className="text-sm text-slate-600 leading-6">
+                  Your Trust Profile provides additional context
+                  around your financial behaviour. It does not
+                  guarantee approval for any banking product.
+                </p>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        <section>
+          <div className="mb-5">
+            <h2 className="text-xl font-semibold text-[#0D2D52]">
+              Available opportunities
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-1">
+              These opportunities are presented for exploration
+              and are subject to applicable Ecobank criteria.
+            </p>
+          </div>
+
+          {opportunities.length === 0 ? (
+            <Card className="p-8 text-center">
+              <div className="text-3xl mb-3">🏦</div>
+
+              <h3 className="font-semibold text-[#0D2D52]">
+                No opportunities available
+              </h3>
+
+              <p className="text-sm text-slate-500 mt-2">
+                There are currently no opportunities to display.
+              </p>
+
+              <div className="mt-6">
+                <Button
+                  onClick={() =>
+                    navigate("financial-growth")
+                  }
+                >
+                  Improve My Profile
+                </Button>
+              </div>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {opportunities.map((opportunity) => (
+                <Card
+                  key={opportunity.id}
+                  className="p-6 flex flex-col"
+                >
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-xl bg-[#EAF1F7] flex items-center justify-center text-2xl shrink-0">
+                        {getCategoryIcon(
+                          opportunity.category
+                        )}
+                      </div>
+
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#2563A0]">
+                          {opportunity.category}
+                        </p>
+
+                        <h3 className="text-lg font-semibold text-[#0D2D52] mt-1">
+                          {opportunity.title}
+                        </h3>
+                      </div>
+                    </div>
+
+                    {opportunity.badge && (
+                      <Badge variant="info">
+                        {opportunity.badge}
+                      </Badge>
                     )}
                   </div>
 
-                  {opt}
-                </button>
-              );
-            })}
-          </div>
-        </div>
+                  <p className="text-sm text-slate-600 leading-6 mb-6">
+                    {opportunity.description}
+                  </p>
 
-        {/* Error */}
-        {error && (
-          <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-            <p className="text-sm text-red-700">
-              {error}
-            </p>
-          </div>
-        )}
+                  <div className="space-y-4 mb-6">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Why it may be relevant
+                      </p>
 
-        {/* Navigation */}
-        <div className="flex items-center gap-3">
-          {step > 0 && (
-            <Button
-              variant="secondary"
-              onClick={() => setStep((s) => s - 1)}
-              className="flex-1"
-              disabled={saving}
-            >
-              Back
-            </Button>
+                      <p className="text-sm text-slate-600 leading-6">
+                        {opportunity.relevance}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">
+                        Eligibility
+                      </p>
+
+                      <p className="text-sm text-slate-600 leading-6">
+                        {opportunity.eligibility}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-auto pt-5 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <p className="text-xs text-slate-400">
+                      Final eligibility and approval are
+                      determined by Ecobank.
+                    </p>
+
+                    {opportunity.action ? (
+                      <Button
+                        onClick={() => {
+                          window.open(
+                            opportunity.action,
+                            "_blank",
+                            "noopener,noreferrer"
+                          );
+                        }}
+                      >
+                        Learn More
+                      </Button>
+                    ) : (
+                      <Button disabled>
+                        Coming Soon
+                      </Button>
+                    )}
+                  </div>
+                </Card>
+              ))}
+            </div>
           )}
+        </section>
 
-          <Button
-            onClick={next}
-            disabled={!canAdvance || saving}
-            className={step > 0 ? "flex-1" : "w-full"}
-            size="lg"
-          >
-            {saving
-              ? "Saving..."
-              : step < steps.length - 1
-                ? "Continue"
-                : "Finish Setup →"}
-          </Button>
-        </div>
+        <Card className="p-6 lg:p-8 bg-[#F4F8FB]">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-lg bg-white flex items-center justify-center shrink-0">
+              ℹ️
+            </div>
 
-        <p className="text-center text-xs text-[#94A3B8] mt-4">
-          Your answers help personalise your experience.
-          They don't affect your score.
-        </p>
+            <div>
+              <h3 className="font-semibold text-[#0D2D52] mb-2">
+                A Trust Profile is not a loan approval
+              </h3>
+
+              <p className="text-sm text-slate-600 leading-6">
+                TrustID provides an explainable view of financial
+                behaviour to help users understand their financial
+                credibility. Any product eligibility, credit
+                assessment or lending decision remains with
+                Ecobank and is subject to its applicable criteria.
+              </p>
+            </div>
+          </div>
+        </Card>
       </div>
-    </div>
+    </CustomerLayout>
   );
 }

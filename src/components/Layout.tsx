@@ -3,29 +3,13 @@ import { Avatar } from "./ui";
 import { useAuth } from "../context/AuthContext";
 import logotext from "../assets/logo-nav-light.png";
 
-type Screen =
-  | "landing"
-  | "signup"
-  | "onboarding"
-  | "consent"
-  | "connect"
-  | "analysis"
-  | "dashboard"
-  | "score-explanation"
-  | "financial-growth"
-  | "score-history"
-  | "opportunity"
-  | "ecobank-login"
-  | "customer-overview"
-  | "customer-detail"
-  | "supporting-evidence"
-  | "recommendation"
-  | "decision-support";
-
-interface NavProps {
-  current: Screen;
-  navigate: (s: Screen) => void;
-}
+type NavProps = {
+  current: string;
+  navigate: (
+    screen: string,
+    params?: { customerId?: string }
+  ) => void;
+};
 
 const customerNav = [
   {
@@ -77,9 +61,7 @@ export function CustomerSidebar({
 
   function handleLogout() {
     logout();
-
     setMenuOpen(false);
-
     navigate("landing");
   }
 
@@ -99,6 +81,7 @@ export function CustomerSidebar({
       <aside className="hidden lg:flex flex-col w-60 shrink-0 bg-white border-r border-[#E2EAF2] min-h-screen">
         <div className="px-6 py-5 border-b border-[#E2EAF2]">
           <button
+            type="button"
             onClick={() => navigate("landing")}
             className="flex items-center gap-2.5 group"
           >
@@ -118,9 +101,8 @@ export function CustomerSidebar({
               return (
                 <button
                   key={id}
-                  onClick={() =>
-                    navigate(id as Screen)
-                  }
+                  type="button"
+                  onClick={() => navigate(id)}
                   className={`
                     w-full flex items-center gap-3 px-3 py-2.5
                     rounded-xl text-sm font-medium transition-all
@@ -156,6 +138,7 @@ export function CustomerSidebar({
 
         <div className="p-4 border-t border-[#E2EAF2]">
           <button
+            type="button"
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-[#64748B] hover:text-[#0D2D52] hover:bg-[#F8FAFB] transition-all"
           >
             <SettingsIcon className="h-4 w-4 text-[#94A3B8]" />
@@ -193,6 +176,7 @@ export function CustomerSidebar({
       {/* Mobile top bar */}
       <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-white border-b border-[#E2EAF2] px-4 h-14 flex items-center justify-between">
         <button
+          type="button"
           onClick={() => navigate("landing")}
           className="flex items-center gap-2"
         >
@@ -204,6 +188,7 @@ export function CustomerSidebar({
         </button>
 
         <button
+          type="button"
           onClick={() => setMenuOpen(!menuOpen)}
           className="p-2 rounded-lg hover:bg-[#F8FAFB]"
         >
@@ -219,8 +204,9 @@ export function CustomerSidebar({
               ({ id, label, icon: Icon }) => (
                 <button
                   key={id}
+                  type="button"
                   onClick={() => {
-                    navigate(id as Screen);
+                    navigate(id);
                     setMenuOpen(false);
                   }}
                   className={`
@@ -262,12 +248,10 @@ export function BankSidebar({
   current,
   navigate,
 }: NavProps) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const { user, logout } = useAuth();
 
   function handleLogout() {
     logout();
-    setMenuOpen(false);
     navigate("landing");
   }
 
@@ -282,83 +266,111 @@ export function BankSidebar({
       : "Ecobank Analyst";
 
   return (
-    <>
-      <aside className="hidden lg:flex flex-col w-60 shrink-0 bg-[#0D2D52] min-h-screen">
-        <div className="px-6 py-5 border-b border-[#163D6A]">
-          <button type="button" onClick={() => navigate("landing")} className="flex items-center gap-3 w-full text-left group">
-            <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition">
-              <span className="text-white text-xs font-bold">E</span>
-            </div>
-            <div>
-              <p className="font-bold text-white text-sm tracking-tight">Ecobank</p>
-              <p className="text-[#7EA8D4] text-xs">TrustID Platform</p>
-            </div>
-          </button>
-        </div>
-
-        <nav className="flex-1 px-3 py-4">
-          <button type="button" onClick={() => navigate("landing")} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-left mb-2 ${current === "landing" ? "bg-white/10 text-white" : "text-[#7EA8D4] hover:text-white hover:bg-white/5"}`}>
-            <HomeIcon className="h-4 w-4 shrink-0" />
-            Home
-          </button>
-
-          <div className="h-px bg-[#163D6A] mb-2" />
-
-          {bankNav.map(({ id, label, icon: Icon }) => (
-            <button key={id} type="button" onClick={() => navigate(id as Screen)} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-left ${current === id ? "bg-white/10 text-white" : "text-[#7EA8D4] hover:text-white hover:bg-white/5"}`}>
-              <Icon className="h-4 w-4 shrink-0" />
-              {label}
-            </button>
-          ))}
-
-          <p className="px-3 pt-5 text-[11px] leading-5 text-[#7EA8D4]/70">
-            Select a customer to access their evidence and assessment workflow.
-          </p>
-        </nav>
-
-        <div className="p-4 border-t border-[#163D6A]">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white">{initials}</div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{displayName}</p>
-              <p className="text-xs text-[#7EA8D4] truncate">{user?.role === "ADMIN" ? "Administrator" : "Credit Analyst"}</p>
-            </div>
+    <aside className="hidden lg:flex flex-col w-60 shrink-0 bg-[#0D2D52] min-h-screen">
+      {/* Logo / Home */}
+      <div className="px-6 py-5 border-b border-[#163D6A]">
+        <button
+          type="button"
+          onClick={() => navigate("landing")}
+          className="flex items-center gap-3 w-full text-left group"
+        >
+          <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition">
+            <span className="text-white text-xs font-bold">
+              E
+            </span>
           </div>
-          <button type="button" onClick={handleLogout} className="mt-3 w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#9DB9D5] hover:text-white hover:bg-white/10 transition-all">
-            <LogoutIcon className="h-4 w-4" />
-            Logout
-          </button>
-        </div>
-      </aside>
 
-      <header className="lg:hidden fixed top-0 left-0 right-0 z-40 bg-[#0D2D52] border-b border-[#163D6A] px-4 h-14 flex items-center justify-between">
-        <button type="button" onClick={() => navigate("landing")} className="flex items-center gap-2">
-          <div className="h-8 w-8 rounded-lg bg-white/10 flex items-center justify-center"><span className="text-white text-xs font-bold">E</span></div>
-          <span className="text-white text-sm font-bold">Ecobank TrustID</span>
-        </button>
-        <button type="button" onClick={() => setMenuOpen((value) => !value)} className="p-2 rounded-lg hover:bg-white/10" aria-label="Open officer menu">
-          <MenuIcon className="h-5 w-5 text-white" />
-        </button>
-      </header>
+          <div>
+            <p className="font-bold text-white text-sm tracking-tight">
+              Ecobank
+            </p>
 
-      {menuOpen && (
-        <div className="lg:hidden fixed top-14 left-0 right-0 z-30 bg-[#0D2D52] border-b border-[#163D6A] shadow-lg">
-          <nav className="p-3 space-y-1">
-            <button type="button" onClick={() => { navigate("landing"); setMenuOpen(false); }} className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-left text-white hover:bg-white/10">
-              <HomeIcon className="h-4 w-4" /> Home
-            </button>
-            {bankNav.map(({ id, label, icon: Icon }) => (
-              <button key={id} type="button" onClick={() => { navigate(id as Screen); setMenuOpen(false); }} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-left ${current === id ? "bg-white/10 text-white" : "text-[#7EA8D4] hover:text-white hover:bg-white/5"}`}>
-                <Icon className="h-4 w-4" /> {label}
+            <p className="text-[#7EA8D4] text-xs">
+              TrustID Platform
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-4 flex flex-col gap-0.5">
+        {/* Home */}
+        <button
+          type="button"
+          onClick={() => navigate("landing")}
+          className={`
+            w-full flex items-center gap-3 px-3 py-2.5
+            rounded-xl text-sm font-medium transition-all
+            text-left mb-2
+            ${
+              current === "landing"
+                ? "bg-white/10 text-white"
+                : "text-[#7EA8D4] hover:text-white hover:bg-white/5"
+            }
+          `}
+        >
+          <HomeIcon className="h-4 w-4 shrink-0" />
+          Home
+        </button>
+
+        <div className="h-px bg-[#163D6A] mb-2" />
+
+        {bankNav.map(
+          ({ id, label, icon: Icon }) => {
+            const active = current === id;
+
+            return (
+              <button
+                key={id}
+                type="button"
+                onClick={() => navigate(id)}
+                className={`
+                  w-full flex items-center gap-3 px-3 py-2.5
+                  rounded-xl text-sm font-medium transition-all
+                  duration-150 text-left
+                  ${
+                    active
+                      ? "bg-white/10 text-white"
+                      : "text-[#7EA8D4] hover:text-white hover:bg-white/5"
+                  }
+                `}
+              >
+                <Icon className="h-4 w-4 shrink-0" />
+                {label}
               </button>
-            ))}
-            <button type="button" onClick={handleLogout} className="mt-2 w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-red-200 hover:bg-red-500/10">
-              <LogoutIcon className="h-4 w-4" /> Logout
-            </button>
-          </nav>
+            );
+          }
+        )}
+      </nav>
+
+      {/* User / Logout */}
+      <div className="p-4 border-t border-[#163D6A]">
+        <div className="flex items-center gap-3 px-3 py-2">
+          <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center text-xs font-semibold text-white">
+            {initials}
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-white truncate">
+              {displayName}
+            </p>
+
+            <p className="text-xs text-[#7EA8D4] truncate">
+              Credit Analyst
+            </p>
+          </div>
         </div>
-      )}
-    </>
+
+        <button
+          type="button"
+          onClick={handleLogout}
+          className="mt-3 w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#9DB9D5] hover:text-white hover:bg-white/10 transition-all"
+        >
+          <LogoutIcon className="h-4 w-4" />
+          Logout
+        </button>
+      </div>
+    </aside>
   );
 }
 

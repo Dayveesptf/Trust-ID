@@ -1,13 +1,16 @@
 import { useEffect, useState } from "react";
 import {
   ArrowLeft,
+  ArrowRight,
   Mail,
   Phone,
   Calendar,
   ShieldCheck,
-  ArrowRight,
+  TrendingUp,
+  AlertCircle,
 } from "lucide-react";
 
+import { BankLayout } from "../components/Layout";
 import {
   Avatar,
   Badge,
@@ -15,7 +18,6 @@ import {
   Card,
   ProgressBar,
 } from "../components/ui";
-import { BankLayout } from "../components/Layout";
 
 import {
   EcobankCustomerDetail,
@@ -23,7 +25,7 @@ import {
   getEcobankCustomer,
 } from "../services/ecobankService";
 
-interface CustomerDetailPageProps {
+interface Props {
   customerId?: string;
   navigate: (
     screen: string,
@@ -45,8 +47,6 @@ function getBandVariant(
       return "fair";
     case "Developing":
       return "warning";
-    case "Needs Improvement":
-      return "neutral";
     default:
       return "neutral";
   }
@@ -86,31 +86,39 @@ function getFactorLevel(score: number, max: number) {
   return "Developing";
 }
 
-interface FactorRowProps {
-  label: string;
-  factor: {
-    score: number;
-    max: number;
+function getFactorLabel(key: string) {
+  const labels: Record<string, string> = {
+    incomeConsistency: "Income Consistency",
+    savingsBehaviour: "Savings Behaviour",
+    repaymentBehaviour: "Repayment Behaviour",
+    cashFlowStability: "Cash-flow Stability",
+    financialDiscipline: "Financial Discipline",
   };
+
+  return labels[key] || key;
 }
 
-function FactorRow({ label, factor }: FactorRowProps) {
+function FactorRow({
+  label,
+  factor,
+}: {
+  label: string;
+  factor: { score: number; max: number };
+}) {
   const percentage =
     factor.max > 0
       ? Math.round((factor.score / factor.max) * 100)
       : 0;
 
-  const level = getFactorLevel(factor.score, factor.max);
-
   return (
-    <div className="py-5 first:pt-0 last:pb-0">
-      <div className="mb-2 flex items-center justify-between gap-4">
+    <div className="py-5 border-b border-slate-100 last:border-b-0">
+      <div className="flex items-center justify-between gap-4 mb-2">
         <div>
-          <p className="font-medium text-[#0D2D52]">
+          <p className="font-semibold text-[#0D2D52]">
             {label}
           </p>
 
-          <p className="mt-0.5 text-xs text-[#64748B]">
+          <p className="text-xs text-slate-500 mt-1">
             {factor.score} / {factor.max} points
           </p>
         </div>
@@ -120,8 +128,8 @@ function FactorRow({ label, factor }: FactorRowProps) {
             {percentage}%
           </p>
 
-          <p className="text-xs text-[#64748B]">
-            {level}
+          <p className="text-xs text-slate-500">
+            {getFactorLevel(factor.score, factor.max)}
           </p>
         </div>
       </div>
@@ -141,18 +149,18 @@ function TrustSummary({
 }) {
   return (
     <Card className="p-6">
-      <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-6">
         <div>
-          <p className="text-sm font-medium text-[#64748B]">
+          <p className="text-sm font-medium text-slate-500">
             TrustID Score
           </p>
 
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-4xl font-bold text-[#0D2D52]">
+          <div className="flex items-baseline gap-2 mt-1">
+            <span className="text-5xl font-bold text-[#0D2D52]">
               {profile.totalScore}
             </span>
 
-            <span className="text-sm text-[#94A3B8]">
+            <span className="text-sm text-slate-400">
               / 850
             </span>
           </div>
@@ -163,21 +171,30 @@ function TrustSummary({
         </Badge>
       </div>
 
-      <div className="mt-6 h-3 overflow-hidden rounded-full bg-[#E2EAF2]">
-        <div
-          className="h-full rounded-full bg-[#0D2D52] transition-all duration-700"
-          style={{
-            width: `${Math.min(
-              (profile.totalScore / 850) * 100,
-              100
-            )}%`,
-          }}
-        />
+      <div className="mt-6">
+        <div className="h-3 rounded-full bg-slate-100 overflow-hidden">
+          <div
+            className="h-full rounded-full bg-[#0D2D52] transition-all"
+            style={{
+              width: `${Math.min(
+                (profile.totalScore / 850) * 100,
+                100
+              )}%`,
+            }}
+          />
+        </div>
+
+        <div className="flex justify-between text-xs text-slate-400 mt-2">
+          <span>0</span>
+          <span>850</span>
+        </div>
       </div>
 
-      <p className="mt-3 text-xs leading-5 text-[#64748B]">
-        This score represents the customer's financial
-        behaviour profile within the TrustID prototype.
+      <p className="text-xs text-slate-500 leading-5 mt-4">
+        TrustID provides an explainable view of the
+        customer's financial behaviour. It is intended as
+        decision-support information and not as an automatic
+        lending decision.
       </p>
     </Card>
   );
@@ -186,14 +203,14 @@ function TrustSummary({
 export default function CustomerDetailPage({
   customerId,
   navigate,
-}: CustomerDetailPageProps) {
+}: Props) {
   const [data, setData] =
     useState<EcobankCustomerDetail | null>(null);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
-  useEffect(() => {
+useEffect(() => {
   if (!customerId) {
     setError("No customer was selected.");
     setLoading(false);
@@ -201,6 +218,8 @@ export default function CustomerDetailPage({
   }
 
   const selectedCustomerId = customerId;
+
+  let cancelled = false;
 
   async function loadCustomer() {
     try {
@@ -210,120 +229,322 @@ export default function CustomerDetailPage({
       const result =
         await getEcobankCustomer(selectedCustomerId);
 
-      setData(result);
+      if (!cancelled) {
+        setData(result);
+      }
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load customer profile."
-      );
+      if (!cancelled) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Unable to load customer profile."
+        );
+      }
     } finally {
-      setLoading(false);
+      if (!cancelled) {
+        setLoading(false);
+      }
     }
   }
 
   loadCustomer();
+
+  return () => {
+    cancelled = true;
+  };
 }, [customerId]);
+
   if (loading) {
     return (
-      <BankLayout current="customer-detail" navigate={navigate}>
-        <div className="min-h-screen bg-[#F8FAFB] pt-14 lg:pt-0">
-        <div className="mx-auto max-w-6xl px-6 py-10 lg:px-8">
-          <div className="animate-pulse space-y-6">
-            <div className="h-5 w-32 rounded bg-[#E2EAF2]" />
-            <div className="h-32 rounded-2xl bg-[#E2EAF2]" />
-            <div className="h-64 rounded-2xl bg-[#E2EAF2]" />
-          </div>
+      <div className="min-h-screen bg-[#F8FAFB] p-6 lg:p-10">
+        <div className="max-w-5xl mx-auto animate-pulse space-y-6">
+          <div className="h-6 w-48 bg-slate-200 rounded" />
+          <div className="h-40 bg-slate-200 rounded-2xl" />
+          <div className="h-64 bg-slate-200 rounded-2xl" />
         </div>
-        </div>
-      </BankLayout>
+      </div>
     );
   }
 
   if (error || !data) {
     return (
-      <BankLayout current="customer-detail" navigate={navigate}>
-        <div className="min-h-screen bg-[#F8FAFB] pt-14 lg:pt-0">
-        <div className="mx-auto max-w-3xl px-6 py-16 text-center">
-          <Card className="p-8">
-            <h2 className="text-xl font-bold text-[#0D2D52]">
-              Unable to load customer
-            </h2>
+      <div className="min-h-screen bg-[#F8FAFB] p-6 lg:p-10">
+        <div className="max-w-3xl mx-auto">
+          <Card className="p-8 text-center">
+            <AlertCircle className="mx-auto text-red-500" size={40} />
 
-            <p className="mt-2 text-sm text-[#64748B]">
-              {error || "Customer information is unavailable."}
+            <h1 className="text-xl font-bold text-[#0D2D52] mt-4">
+              Customer Profile Unavailable
+            </h1>
+
+            <p className="text-sm text-slate-500 mt-2 mb-6">
+              {error}
             </p>
 
             <Button
-              className="mt-6"
-              variant="secondary"
-              onClick={() => navigate("customer-overview")}
+              onClick={() =>
+                navigate("customer-overview")
+              }
             >
-              <ArrowLeft size={16} />
               Back to Customers
             </Button>
           </Card>
         </div>
-        </div>
-      </BankLayout>
+      </div>
     );
   }
 
-  const {
-    customer,
-    trustProfile,
-    financialEvidence,
-    decisionNotice,
-  } = data;
-
-  const firstName = customer.firstName;
-  const lastName = customer.lastName;
+  const customer = data.customer;
+  const profile = data.trustProfile;
+  const evidence = data.financialEvidence;
 
   return (
-    <BankLayout current="customer-detail" navigate={navigate}>
-      <div className="min-h-screen bg-[#F8FAFB] pt-14 lg:pt-0">
-      {/* Header */}
-      <div className="border-b border-[#E2EAF2] bg-white">
-        <div className="mx-auto max-w-6xl px-6 py-6 lg:px-8">
-          <button
-            onClick={() => navigate("customer-overview")}
-            className="mb-5 flex items-center gap-2 text-sm font-medium text-[#64748B] transition hover:text-[#0D2D52]"
-          >
-            <ArrowLeft size={16} />
-            Back to Customers
-          </button>
+    <BankLayout
+      current="customer-overview"
+      navigate={navigate}
+    >
+      <div className="px-6 sm:px-8 py-8 max-w-6xl mx-auto">
+        <button
+          onClick={() =>
+            navigate("customer-overview")
+          }
+          className="flex items-center gap-2 text-sm text-slate-500 hover:text-[#0D2D52] mb-6"
+        >
+          <ArrowLeft size={16} />
+          Back to Customers
+        </button>
 
-          <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+        {/* Customer header */}
+        <Card className="p-6 mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div className="flex items-center gap-4">
               <Avatar
-                initials={getInitials(firstName, lastName)}
+                initials={getInitials(
+                  customer.firstName,
+                  customer.lastName
+                )}
                 size="lg"
               />
 
               <div>
-                <div className="flex flex-wrap items-center gap-3">
-                  <h1 className="text-2xl font-bold text-[#0D2D52]">
-                    {firstName} {lastName}
-                  </h1>
+                <h1 className="text-2xl font-bold text-[#0D2D52]">
+                  {customer.firstName}{" "}
+                  {customer.lastName}
+                </h1>
 
-                  {trustProfile && (
-                    <Badge
-                      variant={getBandVariant(
-                        trustProfile.band
-                      )}
-                    >
-                      {trustProfile.band}
-                    </Badge>
-                  )}
+                <div className="flex flex-wrap gap-x-5 gap-y-2 mt-2 text-sm text-slate-500">
+                  <span className="flex items-center gap-2">
+                    <Mail size={15} />
+                    {customer.email}
+                  </span>
+
+                  <span className="flex items-center gap-2">
+                    <Phone size={15} />
+                    {customer.phone}
+                  </span>
+
+                  <span className="flex items-center gap-2">
+                    <Calendar size={15} />
+                    Joined {formatDate(customer.createdAt)}
+                  </span>
                 </div>
-
-                <p className="mt-1 text-sm text-[#64748B]">
-                  TrustID Customer Profile
-                </p>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-3">
+            <Badge variant={customer.onboardingCompleted ? "success" : "warning"}>
+              {customer.onboardingCompleted
+                ? "Onboarding Complete"
+                : "Onboarding Pending"}
+            </Badge>
+          </div>
+        </Card>
+
+        {!profile ? (
+          <Card className="p-10 text-center mb-6">
+            <ShieldCheck
+              size={42}
+              className="mx-auto text-slate-300"
+            />
+
+            <h2 className="text-lg font-bold text-[#0D2D52] mt-4">
+              Trust Profile Not Available
+            </h2>
+
+            <p className="text-sm text-slate-500 mt-2">
+              This customer has not generated a TrustID
+              profile yet.
+            </p>
+          </Card>
+        ) : (
+          <>
+            <TrustSummary profile={profile} />
+
+            {/* Factors */}
+            <Card className="p-6 mt-6">
+              <div className="mb-5">
+                <p className="text-xs uppercase tracking-widest font-semibold text-slate-400">
+                  Score Breakdown
+                </p>
+
+                <h2 className="text-xl font-bold text-[#0D2D52] mt-1">
+                  Five TrustID Factors
+                </h2>
+
+                <p className="text-sm text-slate-500 mt-1">
+                  The score is built from explainable financial
+                  behaviour signals.
+                </p>
+              </div>
+
+              {Object.entries(profile.factors).map(
+                ([key, factor]) => (
+                  <FactorRow
+                    key={key}
+                    label={getFactorLabel(key)}
+                    factor={factor}
+                  />
+                )
+              )}
+            </Card>
+
+            {/* Evidence snapshot */}
+            {evidence && (
+              <Card className="p-6 mt-6">
+                <div className="flex items-center justify-between mb-5">
+                  <div>
+                    <p className="text-xs uppercase tracking-widest font-semibold text-slate-400">
+                      Financial Snapshot
+                    </p>
+
+                    <h2 className="text-xl font-bold text-[#0D2D52] mt-1">
+                      Supporting Evidence
+                    </h2>
+                  </div>
+
+                  <TrendingUp
+                    size={22}
+                    className="text-[#0D2D52]"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500">
+                      Monthly Inflow
+                    </p>
+                    <p className="font-bold text-[#0D2D52] mt-1">
+                      {formatCurrency(
+                        evidence.averageMonthlyInflow
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500">
+                      Monthly Savings
+                    </p>
+                    <p className="font-bold text-[#0D2D52] mt-1">
+                      {formatCurrency(
+                        evidence.averageMonthlySavings
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500">
+                      Savings Rate
+                    </p>
+                    <p className="font-bold text-[#0D2D52] mt-1">
+                      {evidence.savingsRate}%
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500">
+                      Repayment Rate
+                    </p>
+                    <p className="font-bold text-[#0D2D52] mt-1">
+                      {evidence.repaymentOnTimeRate}%
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-xl p-4">
+                    <p className="text-xs text-slate-500">
+                      Cash-flow Stability
+                    </p>
+                    <p className="font-bold text-[#0D2D52] mt-1">
+                      {evidence.cashFlowStability}%
+                    </p>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Strengths / opportunities */}
+            <div className="grid lg:grid-cols-2 gap-6 mt-6">
+              <Card className="p-6">
+                <h2 className="font-bold text-[#0D2D52]">
+                  Strengths
+                </h2>
+
+                <div className="space-y-3 mt-4">
+                  {profile.strengths.length > 0 ? (
+                    profile.strengths.map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex gap-3"
+                      >
+                        <div className="w-6 h-6 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                          ✓
+                        </div>
+
+                        <p className="text-sm text-slate-600 leading-6">
+                          {item}
+                        </p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      No strengths have been recorded.
+                    </p>
+                  )}
+                </div>
+              </Card>
+
+              <Card className="p-6">
+                <h2 className="font-bold text-[#0D2D52]">
+                  Opportunities
+                </h2>
+
+                <div className="space-y-3 mt-4">
+                  {profile.opportunities.length > 0 ? (
+                    profile.opportunities.map(
+                      (item, index) => (
+                        <div
+                          key={index}
+                          className="flex gap-3"
+                        >
+                          <div className="w-6 h-6 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+                            !
+                          </div>
+
+                          <p className="text-sm text-slate-600 leading-6">
+                            {item}
+                          </p>
+                        </div>
+                      )
+                    )
+                  ) : (
+                    <p className="text-sm text-slate-500">
+                      No opportunities have been recorded.
+                    </p>
+                  )}
+                </div>
+              </Card>
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-3 mt-6">
               <Button
                 variant="secondary"
                 onClick={() =>
@@ -337,304 +558,35 @@ export default function CustomerDetailPage({
 
               <Button
                 onClick={() =>
+                  navigate("recommendation", {
+                    customerId: customer._id,
+                  })
+                }
+              >
+                View Assessment
+                <ArrowRight size={16} />
+              </Button>
+
+              <Button
+                variant="secondary"
+                onClick={() =>
                   navigate("decision-support", {
                     customerId: customer._id,
                   })
                 }
               >
                 Decision Support
-                <ArrowRight size={16} />
               </Button>
             </div>
-          </div>
-        </div>
-      </div>
-
-      <main className="mx-auto max-w-6xl px-6 py-8 lg:px-8">
-        {/* Customer information */}
-        <div className="mb-6 grid gap-4 md:grid-cols-3">
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <Mail
-                size={18}
-                className="mt-0.5 text-[#2563A0]"
-              />
-
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
-                  Email
-                </p>
-
-                <p className="mt-1 break-all text-sm font-medium text-[#0D2D52]">
-                  {customer.email}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <Phone
-                size={18}
-                className="mt-0.5 text-[#2563A0]"
-              />
-
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
-                  Phone
-                </p>
-
-                <p className="mt-1 text-sm font-medium text-[#0D2D52]">
-                  {customer.phone}
-                </p>
-              </div>
-            </div>
-          </Card>
-
-          <Card className="p-5">
-            <div className="flex items-start gap-3">
-              <Calendar
-                size={18}
-                className="mt-0.5 text-[#2563A0]"
-              />
-
-              <div>
-                <p className="text-xs font-medium uppercase tracking-wide text-[#94A3B8]">
-                  Customer Since
-                </p>
-
-                <p className="mt-1 text-sm font-medium text-[#0D2D52]">
-                  {formatDate(customer.createdAt)}
-                </p>
-              </div>
-            </div>
-          </Card>
-        </div>
-
-        {!trustProfile ? (
-          <Card className="p-8 text-center">
-            <ShieldCheck
-              size={40}
-              className="mx-auto text-[#94A3B8]"
-            />
-
-            <h2 className="mt-4 text-lg font-bold text-[#0D2D52]">
-              Trust Profile Not Available
-            </h2>
-
-            <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#64748B]">
-              This customer has not generated a TrustID
-              financial behaviour profile yet.
-            </p>
-
-            <div className="mt-6">
-              <Button
-                variant="secondary"
-                onClick={() =>
-                  navigate("customer-overview")
-                }
-              >
-                <ArrowLeft size={16} />
-                Back to Customers
-              </Button>
-            </div>
-          </Card>
-        ) : (
-          <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-            {/* Left */}
-            <div className="space-y-6">
-              <TrustSummary profile={trustProfile} />
-
-              <Card className="p-6">
-                <div className="mb-5">
-                  <h2 className="text-lg font-bold text-[#0D2D52]">
-                    Trust Factors
-                  </h2>
-
-                  <p className="mt-1 text-sm text-[#64748B]">
-                    Breakdown of the customer's TrustID score.
-                  </p>
-                </div>
-
-                <div className="divide-y divide-[#E2EAF2]">
-                  <FactorRow
-                    label="Income Consistency"
-                    factor={
-                      trustProfile.factors.incomeConsistency
-                    }
-                  />
-
-                  <FactorRow
-                    label="Savings Behaviour"
-                    factor={
-                      trustProfile.factors.savingsBehaviour
-                    }
-                  />
-
-                  <FactorRow
-                    label="Repayment Behaviour"
-                    factor={
-                      trustProfile.factors.repaymentBehaviour
-                    }
-                  />
-
-                  <FactorRow
-                    label="Cash-flow Stability"
-                    factor={
-                      trustProfile.factors.cashFlowStability
-                    }
-                  />
-
-                  <FactorRow
-                    label="Financial Discipline"
-                    factor={
-                      trustProfile.factors.financialDiscipline
-                    }
-                  />
-                </div>
-              </Card>
-            </div>
-
-            {/* Right */}
-            <div className="space-y-6">
-              <Card className="p-6">
-                <h2 className="text-lg font-bold text-[#0D2D52]">
-                  Financial Evidence
-                </h2>
-
-                <p className="mt-1 text-sm text-[#64748B]">
-                  Key indicators supporting the TrustID profile.
-                </p>
-
-                {financialEvidence ? (
-                  <div className="mt-6 space-y-4">
-                    <div className="flex items-center justify-between gap-4 border-b border-[#E2EAF2] pb-4">
-                      <span className="text-sm text-[#64748B]">
-                        Average monthly inflow
-                      </span>
-
-                      <span className="font-semibold text-[#0D2D52]">
-                        {formatCurrency(
-                          financialEvidence.averageMonthlyInflow
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 border-b border-[#E2EAF2] pb-4">
-                      <span className="text-sm text-[#64748B]">
-                        Average monthly savings
-                      </span>
-
-                      <span className="font-semibold text-[#0D2D52]">
-                        {formatCurrency(
-                          financialEvidence.averageMonthlySavings
-                        )}
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 border-b border-[#E2EAF2] pb-4">
-                      <span className="text-sm text-[#64748B]">
-                        Repayment on-time rate
-                      </span>
-
-                      <span className="font-semibold text-[#0D2D52]">
-                        {financialEvidence.repaymentOnTimeRate}%
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4 border-b border-[#E2EAF2] pb-4">
-                      <span className="text-sm text-[#64748B]">
-                        Savings rate
-                      </span>
-
-                      <span className="font-semibold text-[#0D2D52]">
-                        {financialEvidence.savingsRate}%
-                      </span>
-                    </div>
-
-                    <div className="flex items-center justify-between gap-4">
-                      <span className="text-sm text-[#64748B]">
-                        Cash-flow stability
-                      </span>
-
-                      <span className="font-semibold text-[#0D2D52]">
-                        {financialEvidence.cashFlowStability}%
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="mt-6 text-sm text-[#64748B]">
-                    Financial evidence is not available.
-                  </p>
-                )}
-              </Card>
-
-              <Card className="p-6">
-                <h2 className="text-lg font-bold text-[#0D2D52]">
-                  Profile Insights
-                </h2>
-
-                {trustProfile.strengths.length > 0 && (
-                  <div className="mt-5">
-                    <p className="text-sm font-semibold text-[#0D2D52]">
-                      Strengths
-                    </p>
-
-                    <ul className="mt-3 space-y-2">
-                      {trustProfile.strengths.map(
-                        (strength) => (
-                          <li
-                            key={strength}
-                            className="flex gap-2 text-sm leading-5 text-[#475569]"
-                          >
-                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#10B981]" />
-                            {strength}
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                )}
-
-                {trustProfile.opportunities.length > 0 && (
-                  <div className="mt-6">
-                    <p className="text-sm font-semibold text-[#0D2D52]">
-                      Opportunities
-                    </p>
-
-                    <ul className="mt-3 space-y-2">
-                      {trustProfile.opportunities.map(
-                        (opportunity) => (
-                          <li
-                            key={opportunity}
-                            className="flex gap-2 text-sm leading-5 text-[#475569]"
-                          >
-                            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#F59E0B]" />
-                            {opportunity}
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                )}
-              </Card>
-
-              <Card className="border-[#D7E5F0] bg-[#F1F7FB] p-5">
-                <div className="flex gap-3">
-                  <ShieldCheck
-                    size={20}
-                    className="mt-0.5 shrink-0 text-[#2563A0]"
-                  />
-
-                  <p className="text-xs leading-5 text-[#475569]">
-                    {decisionNotice}
-                  </p>
-                </div>
-              </Card>
-            </div>
-          </div>
+          </>
         )}
-      </main>
+
+        <div className="mt-8 p-4 bg-slate-50 rounded-xl text-xs text-slate-500 leading-5">
+          <strong className="text-slate-700">
+            Decision-support notice:
+          </strong>{" "}
+          {data.decisionNotice}
+        </div>
       </div>
     </BankLayout>
   );

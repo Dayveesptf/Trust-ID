@@ -38,6 +38,8 @@ export default function ConnectPage({ navigate }: Props) {
   const [error, setError] = useState("");
 
   const handleStartAnalysis = async () => {
+    if (connecting) return;
+
     setError("");
     setConnecting(true);
 

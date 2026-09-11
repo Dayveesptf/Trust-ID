@@ -1,10 +1,9 @@
 import { useState } from "react";
-
 import { Button, Checkbox } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
 import { grantConsent } from "../services/onboardingService";
 
-import logotext from "../assets/logo-nav-light.png";
+import logoNavLight from "../assets/logo-nav-light.png";
 
 interface Props {
   navigate: (s: string) => void;
@@ -55,12 +54,6 @@ export default function ConsentPage({ navigate }: Props) {
       setError("");
 
       await grantConsent();
-
-      /*
-       * Refresh the authenticated user so that the
-       * in-memory auth state immediately knows consent
-       * has been granted.
-       */
       await refreshUser();
 
       navigate("connect");
@@ -78,15 +71,13 @@ export default function ConsentPage({ navigate }: Props) {
   return (
     <div className="min-h-screen bg-[#F8FAFB] flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-xl animate-fade-in-up">
-        {/* Logo */}
         <div className="flex items-center gap-2 mb-8">
           <button
             type="button"
             onClick={() => navigate("landing")}
-            className="flex items-center"
           >
             <img
-              src={logotext}
+              src={logoNavLight}
               alt="TrustID"
               className="h-7 w-auto"
             />
@@ -94,7 +85,6 @@ export default function ConsentPage({ navigate }: Props) {
         </div>
 
         <div className="bg-white rounded-2xl border border-[#E2EAF2] shadow-sm overflow-hidden">
-          {/* Header */}
           <div className="bg-[#0D2D52] px-8 py-8">
             <div className="h-12 w-12 rounded-2xl bg-white/10 flex items-center justify-center mb-4">
               <svg
@@ -108,7 +98,6 @@ export default function ConsentPage({ navigate }: Props) {
                   d="M12 2L4 6v6c0 5 3.5 9.7 8 11 4.5-1.3 8-6 8-11V6L12 2z"
                   strokeLinejoin="round"
                 />
-
                 <path
                   d="M9 12l2 2.5 4-4"
                   strokeLinecap="round"
@@ -117,150 +106,116 @@ export default function ConsentPage({ navigate }: Props) {
               </svg>
             </div>
 
-            <h1 className="text-2xl font-bold text-white tracking-tight mb-2">
-              Your data. Your choice.
+            <p className="text-xs font-semibold uppercase tracking-widest text-white/50 mb-2">
+              Your permission matters
+            </p>
+
+            <h1 className="text-2xl font-bold text-white">
+              Give consent to analyse your financial behaviour
             </h1>
 
-            <p className="text-white/70 text-sm leading-relaxed">
-              TrustID needs your permission to analyse relevant
-              financial behaviour to generate your Trust Profile.
-              You remain in control.
+            <p className="text-sm text-white/65 leading-relaxed mt-3">
+              TrustID uses financial behaviour to build an explainable
+              financial credibility profile.
             </p>
           </div>
 
-          <div className="px-8 py-7">
-            {/* What we analyse */}
-            <p className="text-xs font-semibold text-[#64748B] uppercase tracking-widest mb-4">
-              What we analyse
-            </p>
+          <div className="p-8">
+            <div className="mb-7">
+              <p className="text-sm text-[#475569] leading-relaxed">
+                By continuing, you agree that TrustID may analyse the
+                financial behaviour described below to generate your
+                TrustID Score and financial insights.
+              </p>
+            </div>
 
-            <div className="space-y-3 mb-8">
-              {categories.map((c) => (
+            <div className="space-y-3 mb-7">
+              {categories.map((category) => (
                 <div
-                  key={c.label}
-                  className="flex items-start gap-4 p-3.5 rounded-xl bg-[#F8FAFB] border border-[#E2EAF2]"
+                  key={category.label}
+                  className="flex items-start gap-4 rounded-xl border border-[#E2EAF2] bg-[#F8FAFB] p-4"
                 >
-                  <span className="text-xl shrink-0 mt-0.5">
-                    {c.icon}
-                  </span>
+                  <div className="h-10 w-10 rounded-xl bg-white border border-[#E2EAF2] flex items-center justify-center shrink-0">
+                    <span className="text-lg">
+                      {category.icon}
+                    </span>
+                  </div>
 
                   <div>
                     <p className="text-sm font-semibold text-[#0D1F35]">
-                      {c.label}
+                      {category.label}
                     </p>
 
-                    <p className="text-xs text-[#64748B] mt-0.5">
-                      {c.desc}
+                    <p className="text-xs text-[#64748B] mt-1 leading-relaxed">
+                      {category.desc}
                     </p>
-                  </div>
-
-                  <div className="ml-auto shrink-0">
-                    <div className="h-5 w-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center">
-                      <svg
-                        className="h-3 w-3 text-emerald-600"
-                        viewBox="0 0 10 10"
-                        fill="none"
-                      >
-                        <path
-                          d="M2 5l2 2.5 4-4"
-                          stroke="currentColor"
-                          strokeWidth="1.5"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                        />
-                      </svg>
-                    </div>
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Privacy note */}
-            <div className="bg-[#EFF4F9] border border-[#C8D9EC] rounded-xl p-4 mb-6">
-              <div className="flex gap-3">
-                <div className="h-8 w-8 rounded-lg bg-white flex items-center justify-center shrink-0">
-                  <svg
-                    className="h-4 w-4 text-[#0D2D52]"
-                    viewBox="0 0 16 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  >
-                    <rect
-                      x="3"
-                      y="7"
-                      width="10"
-                      height="7"
-                      rx="1.5"
-                    />
-
-                    <path
-                      d="M5 7V5a3 3 0 016 0v2"
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </div>
-
-                <div>
-                  <p className="text-xs font-semibold text-[#0D2D52] mb-1">
-                    Your privacy matters
-                  </p>
-
-                  <p className="text-xs text-[#64748B] leading-relaxed">
-                    TrustID only analyses the financial information
-                    required to generate your Trust Profile. Your
-                    information is not used without your permission.
-                  </p>
-                </div>
-              </div>
+            <div className="rounded-xl border border-[#D7E5F2] bg-[#F3F8FC] p-4 mb-6">
+              <p className="text-xs text-[#475569] leading-relaxed">
+                <span className="font-semibold text-[#0D2D52]">
+                  Important:
+                </span>{" "}
+                TrustID is a competition prototype using simulated
+                financial data. No real bank account is accessed
+                during this demonstration.
+              </p>
             </div>
 
-            {/* Consent checkbox */}
-            <div className="mb-6">
+            <div
+              className={`rounded-xl border p-4 mb-5 transition-colors ${
+                consented
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-[#E2EAF2] bg-white"
+              }`}
+            >
               <Checkbox
                 checked={consented}
-                onChange={(checked) => {
+                onChange={(checked: boolean) => {
                   setConsented(checked);
-                  setError("");
+
+                  if (error) {
+                    setError("");
+                  }
                 }}
-                label={
-                  <span>
-                    I agree to let TrustID analyse my financial
-                    behaviour to generate my Trust Profile.
-                  </span>
-                }
+                label="I understand and consent to TrustID analysing my financial behaviour for this prototype."
               />
             </div>
 
             {error && (
-              <div className="mb-5 rounded-xl border border-red-200 bg-red-50 px-4 py-3">
-                <p className="text-sm text-red-600 leading-relaxed">
+              <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 mb-5">
+                <p className="text-xs font-medium text-red-700">
                   {error}
                 </p>
               </div>
             )}
 
             <Button
-              type="button"
               fullWidth
               size="lg"
               disabled={!consented || saving}
               onClick={handleConsent}
             >
               {saving
-                ? "Saving your consent..."
-                : "I Agree & Continue"}
+                ? "Saving Consent…"
+                : "I Agree & Continue →"}
             </Button>
 
-            <p className="text-center text-xs text-[#94A3B8] mt-4 leading-relaxed">
-              You can review your consent and financial profile
-              information through your TrustID account.
-            </p>
+            <button
+              type="button"
+              onClick={() => navigate("onboarding")}
+              className="w-full mt-4 text-sm font-medium text-[#64748B] hover:text-[#0D2D52] transition-colors"
+            >
+              ← Back to onboarding
+            </button>
           </div>
         </div>
 
-        <p className="text-center text-xs text-[#94A3B8] mt-6">
-          © 2026 TrustID · Competition Prototype
+        <p className="text-center text-xs text-[#94A3B8] mt-5">
+          Your financial information remains under your control.
         </p>
       </div>
     </div>

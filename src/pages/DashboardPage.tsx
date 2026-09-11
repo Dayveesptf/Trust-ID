@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-
 import { CustomerLayout } from "../components/Layout";
 import {
   Card,
@@ -9,9 +8,7 @@ import {
   getLevelVariant,
   getLevelColor,
 } from "../components/ui";
-
 import { useAuth } from "../context/AuthContext";
-
 import {
   getScoreHistory,
   getTrustProfile,
@@ -69,20 +66,20 @@ export default function DashboardPage({ navigate }: Props) {
   useEffect(() => {
     let mounted = true;
 
-    const loadDashboard = async () => {
-      setLoading(true);
-      setError("");
-
+    async function loadDashboard() {
       try {
-        const [trustProfile, scoreHistory] = await Promise.all([
+        setLoading(true);
+        setError("");
+
+        const [profileData, historyData] = await Promise.all([
           getTrustProfile(),
           getScoreHistory(),
         ]);
 
         if (!mounted) return;
 
-        setProfile(trustProfile);
-        setHistory(scoreHistory);
+        setProfile(profileData);
+        setHistory(historyData || []);
       } catch (err) {
         if (!mounted) return;
 
@@ -96,7 +93,7 @@ export default function DashboardPage({ navigate }: Props) {
           setLoading(false);
         }
       }
-    };
+    }
 
     loadDashboard();
 
@@ -106,7 +103,6 @@ export default function DashboardPage({ navigate }: Props) {
   }, []);
 
   const currentScore = profile?.totalScore ?? 0;
-  const maxScore = 850;
 
   const previousScore = useMemo(() => {
     if (history.length < 2) {
@@ -159,9 +155,10 @@ export default function DashboardPage({ navigate }: Props) {
     ];
 
     return rawFactors.map((factor) => {
-      const percentage = Math.round(
-        (factor.score / factor.max) * 100
-      );
+      const percentage =
+        factor.max > 0
+          ? Math.round((factor.score / factor.max) * 100)
+          : 0;
 
       return {
         ...factor,
@@ -175,36 +172,33 @@ export default function DashboardPage({ navigate }: Props) {
     return history.slice(-7);
   }, [history]);
 
-  const firstName = user?.firstName || "there";
+  const strengths =
+    profile?.strengths?.length
+      ? profile.strengths
+      : ["Keep building consistent financial habits."];
+
+  const opportunities =
+    profile?.opportunities?.length
+      ? profile.opportunities
+      : ["Continue improving your financial profile."];
 
   if (loading) {
     return (
       <CustomerLayout current="dashboard" navigate={navigate}>
         <div className="max-w-4xl mx-auto px-5 sm:px-8 py-8">
-          <div className="mb-8">
-            <div className="h-3 w-32 rounded bg-[#E2EAF2] animate-pulse mb-3" />
-            <div className="h-7 w-56 rounded bg-[#E2EAF2] animate-pulse" />
+          <div className="mb-8 animate-pulse">
+            <div className="h-3 w-32 bg-[#E2EAF2] rounded mb-3" />
+            <div className="h-8 w-56 bg-[#E2EAF2] rounded" />
           </div>
 
-          <Card padding="none" className="mb-6 overflow-hidden">
-            <div className="bg-[#0D2D52] px-6 pt-8 pb-8 sm:px-8">
-              <div className="flex flex-col sm:flex-row items-center gap-8">
-                <div className="h-[180px] w-[180px] rounded-full border-[14px] border-white/10 animate-pulse" />
-
-                <div className="flex-1 w-full">
-                  <div className="h-6 w-32 bg-white/10 rounded-full animate-pulse mb-4" />
-                  <div className="h-6 w-48 bg-white/10 rounded animate-pulse mb-3" />
-                  <div className="h-4 w-full max-w-sm bg-white/10 rounded animate-pulse mb-2" />
-                  <div className="h-4 w-3/4 max-w-sm bg-white/10 rounded animate-pulse" />
-                </div>
-              </div>
-            </div>
+          <Card className="mb-6 overflow-hidden">
+            <div className="h-64 bg-[#0D2D52] animate-pulse" />
           </Card>
 
           <div className="space-y-3">
             {[1, 2, 3, 4, 5].map((item) => (
-              <Card key={item} padding="sm">
-                <div className="h-10 w-full bg-[#F1F5F9] rounded-lg animate-pulse" />
+              <Card key={item}>
+                <div className="h-12 bg-[#F8FAFB] rounded animate-pulse" />
               </Card>
             ))}
           </div>
@@ -219,36 +213,22 @@ export default function DashboardPage({ navigate }: Props) {
         <div className="max-w-4xl mx-auto px-5 sm:px-8 py-12">
           <Card className="text-center py-12">
             <div className="h-14 w-14 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center mx-auto mb-5">
-              <svg
-                className="h-6 w-6 text-amber-600"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.7"
-              >
-                <path
-                  d="M12 8v5M12 16.5v.5"
-                  strokeLinecap="round"
-                />
-                <path
-                  d="M10.3 4.2L2.2 18a2 2 0 001.7 3h16.2a2 2 0 001.7-3L13.7 4.2a2 2 0 00-3.4 0z"
-                  strokeLinejoin="round"
-                />
-              </svg>
+              <span className="text-xl">!</span>
             </div>
 
-            <h2 className="text-xl font-bold text-[#0D1F35] mb-2">
+            <h2 className="text-xl font-bold text-[#0D1F35]">
               Your Trust Profile isn't available yet
             </h2>
 
-            <p className="text-sm text-[#64748B] max-w-md mx-auto mb-6">
+            <p className="text-sm text-[#64748B] max-w-md mx-auto mt-2">
               {error ||
                 "Complete your financial analysis first and your Trust Profile will appear here."}
             </p>
 
             <button
+              type="button"
               onClick={() => navigate("connect")}
-              className="inline-flex items-center justify-center rounded-xl bg-[#0D2D52] px-5 py-3 text-sm font-semibold text-white hover:bg-[#163D6A] transition-colors"
+              className="mt-6 inline-flex items-center justify-center rounded-xl bg-[#0D2D52] px-5 py-3 text-sm font-semibold text-white hover:bg-[#163D6A]"
             >
               Start Analysis →
             </button>
@@ -258,63 +238,49 @@ export default function DashboardPage({ navigate }: Props) {
     );
   }
 
-  const scorePct = currentScore / maxScore;
-
-  const strengths =
-    profile.strengths.length > 0
-      ? profile.strengths
-      : ["Keep building consistent financial habits"];
-
-  const opportunities =
-    profile.opportunities.length > 0
-      ? profile.opportunities
-      : ["Continue improving your financial profile"];
-
-  const initials = getInitials(user?.firstName, user?.lastName);
+  const initials = getInitials(
+    user?.firstName,
+    user?.lastName
+  );
 
   return (
     <CustomerLayout current="dashboard" navigate={navigate}>
       <div className="max-w-4xl mx-auto px-5 sm:px-8 py-8">
-        {/* Page header */}
         <div className="mb-8">
           <p className="text-xs font-semibold text-[#94A3B8] uppercase tracking-widest mb-1">
-            Welcome back, {firstName}
+            Welcome back, {user?.firstName || "there"}
           </p>
 
-          <h1 className="text-2xl font-bold text-[#0D1F35] tracking-tight">
+          <h1 className="text-2xl font-bold text-[#0D1F35]">
             Your Trust Profile
           </h1>
         </div>
 
-        {/* Hero score card */}
         <Card padding="none" className="mb-6 overflow-hidden">
-          <div className="bg-[#0D2D52] px-6 pt-8 pb-0 sm:px-8">
+          <div className="bg-[#0D2D52] px-6 pt-8 pb-8 sm:px-8">
             <div className="flex flex-col sm:flex-row items-center sm:items-start gap-8">
-              {/* Score ring */}
               <div className="relative shrink-0">
                 <ScoreRing
                   score={currentScore}
-                  max={maxScore}
+                  max={850}
                   size={180}
                   color="#10B981"
                 />
 
                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                  <p className="text-4xl font-bold text-white font-['JetBrains_Mono',monospace] leading-none">
+                  <p className="text-4xl font-bold text-white font-['JetBrains_Mono',monospace]">
                     {currentScore}
                   </p>
 
-                  <p className="text-white/50 text-sm mt-1">
-                    of {maxScore}
+                  <p className="text-white/50 text-sm">
+                    of 850
                   </p>
                 </div>
               </div>
 
-              {/* Score info */}
-              <div className="flex-1 sm:pt-4 text-center sm:text-left pb-6">
+              <div className="flex-1 sm:pt-4 text-center sm:text-left">
                 <div className="inline-flex items-center gap-1.5 bg-emerald-500/20 text-emerald-300 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-500/30 mb-3">
                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-
                   {profile.band} Financial Profile
                 </div>
 
@@ -323,39 +289,34 @@ export default function DashboardPage({ navigate }: Props) {
                 </h2>
 
                 <p className="text-white/60 text-sm leading-relaxed mb-5 max-w-sm">
-                  Your score reflects patterns in your financial behaviour
-                  across income, savings, repayment, cash flow and financial
+                  Your score reflects patterns across income,
+                  savings, repayment, cash flow and financial
                   discipline.
                 </p>
 
                 <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
                   <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5">
-                    <p className="text-xs text-white/50 mb-0.5">
-                      Previous score
+                    <p className="text-xs text-white/50">
+                      Previous
                     </p>
-
-                    <p className="text-white font-bold font-['JetBrains_Mono',monospace]">
+                    <p className="text-white font-bold">
                       {previousScore || "—"}
                     </p>
                   </div>
 
                   <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-4 py-2.5">
-                    <p className="text-xs text-emerald-400/70 mb-0.5">
+                    <p className="text-xs text-emerald-400/70">
                       Change
                     </p>
-
-                    <p className="text-emerald-400 font-bold font-['JetBrains_Mono',monospace]">
-                      {scoreChange > 0
-                        ? `+${scoreChange}`
-                        : scoreChange}
+                    <p className="text-emerald-400 font-bold">
+                      {scoreChange > 0 ? `+${scoreChange}` : scoreChange}
                     </p>
                   </div>
 
                   <div className="bg-white/5 border border-white/10 rounded-xl px-4 py-2.5">
-                    <p className="text-xs text-white/50 mb-0.5">
-                      Last updated
+                    <p className="text-xs text-white/50">
+                      Updated
                     </p>
-
                     <p className="text-white font-bold text-sm">
                       {formatDate(profile.generatedAt)}
                     </p>
@@ -365,57 +326,25 @@ export default function DashboardPage({ navigate }: Props) {
             </div>
           </div>
 
-          {/* Bottom actions */}
-          <div className="px-6 sm:px-8 py-4 flex flex-wrap gap-3 border-t border-[#E2EAF2] bg-white">
+          <div className="px-6 sm:px-8 py-4 flex flex-wrap gap-5 border-t border-[#E2EAF2]">
             <button
+              type="button"
               onClick={() => navigate("score-explanation")}
-              className="text-sm font-semibold text-[#0D2D52] hover:text-[#163D6A] flex items-center gap-1.5 transition-colors"
+              className="text-sm font-semibold text-[#0D2D52] hover:underline"
             >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <circle cx="8" cy="8" r="6.5" />
-                <path d="M8 7v5M8 5v.5" strokeLinecap="round" />
-              </svg>
-
               How is my score calculated?
             </button>
 
-            <div className="h-4 w-px bg-[#E2EAF2] self-center" />
-
             <button
+              type="button"
               onClick={() => navigate("financial-growth")}
-              className="text-sm font-semibold text-[#10B981] hover:text-emerald-600 flex items-center gap-1.5 transition-colors"
+              className="text-sm font-semibold text-[#10B981] hover:underline"
             >
-              <svg
-                className="h-4 w-4"
-                viewBox="0 0 16 16"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="1.5"
-              >
-                <path
-                  d="M2 12l4-4 3 3 5-5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-                <path
-                  d="M11 6h3v3"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-
               Improve My Profile
             </button>
           </div>
         </Card>
 
-        {/* Trust Factors */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-base font-bold text-[#0D1F35]">
@@ -423,6 +352,7 @@ export default function DashboardPage({ navigate }: Props) {
             </h3>
 
             <button
+              type="button"
               onClick={() => navigate("score-explanation")}
               className="text-xs font-semibold text-[#0D2D52] hover:underline"
             >
@@ -440,7 +370,7 @@ export default function DashboardPage({ navigate }: Props) {
               >
                 <div className="flex items-center gap-4">
                   <div
-                    className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-xs font-['JetBrains_Mono',monospace]"
+                    className="h-10 w-10 rounded-xl flex items-center justify-center shrink-0 text-white font-bold text-xs"
                     style={{
                       backgroundColor: getLevelColor(
                         factor.percentage
@@ -465,13 +395,14 @@ export default function DashboardPage({ navigate }: Props) {
                     </div>
 
                     <ProgressBar
-                      value={factor.percentage}
+                      value={factor.score}
+                      max={factor.max}
                       color={getLevelColor(factor.percentage)}
                       size="sm"
                     />
                   </div>
 
-                  <p className="text-xs text-[#94A3B8] font-medium shrink-0 hidden sm:block">
+                  <p className="text-xs text-[#94A3B8] hidden sm:block">
                     {factor.score}/{factor.max}
                   </p>
                 </div>
@@ -480,35 +411,19 @@ export default function DashboardPage({ navigate }: Props) {
           </div>
         </div>
 
-        {/* Strengths & Improvements */}
         <div className="grid sm:grid-cols-2 gap-4 mb-6">
           <Card>
             <p className="text-xs font-semibold text-[#64748B] uppercase tracking-widest mb-3">
               Key Strengths
             </p>
 
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {strengths.map((strength) => (
                 <div
                   key={strength}
-                  className="flex items-center gap-2.5 text-sm text-[#374151]"
+                  className="flex gap-2.5 text-sm text-[#374151]"
                 >
-                  <div className="h-5 w-5 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center shrink-0">
-                    <svg
-                      className="h-3 w-3 text-emerald-600"
-                      viewBox="0 0 10 10"
-                      fill="none"
-                    >
-                      <path
-                        d="M2 5l2 2.5 4-4"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-
+                  <span className="text-emerald-600">✓</span>
                   <span>{strength}</span>
                 </div>
               ))}
@@ -520,27 +435,13 @@ export default function DashboardPage({ navigate }: Props) {
               Areas to Improve
             </p>
 
-            <div className="space-y-2.5">
+            <div className="space-y-3">
               {opportunities.map((opportunity) => (
                 <div
                   key={opportunity}
-                  className="flex items-center gap-2.5 text-sm text-[#374151]"
+                  className="flex gap-2.5 text-sm text-[#374151]"
                 >
-                  <div className="h-5 w-5 rounded-full bg-amber-50 border border-amber-200 flex items-center justify-center shrink-0">
-                    <svg
-                      className="h-3 w-3 text-amber-600"
-                      viewBox="0 0 10 10"
-                      fill="none"
-                    >
-                      <path
-                        d="M5 3v4M5 8v.5"
-                        stroke="currentColor"
-                        strokeWidth="1.5"
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </div>
-
+                  <span className="text-amber-600">!</span>
                   <span>{opportunity}</span>
                 </div>
               ))}
@@ -548,22 +449,22 @@ export default function DashboardPage({ navigate }: Props) {
           </Card>
         </div>
 
-        {/* Score trend */}
         <Card>
           <div className="flex items-center justify-between mb-4">
             <div>
-              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-widest mb-1">
+              <p className="text-xs font-semibold text-[#64748B] uppercase tracking-widest">
                 Score Trend
               </p>
 
-              <p className="text-sm text-[#64748B]">
+              <p className="text-sm text-[#64748B] mt-1">
                 {scoreChange > 0
-                  ? `Your TrustID score increased by ${scoreChange} points`
+                  ? `Your score increased by ${scoreChange} points`
                   : "Your TrustID score history"}
               </p>
             </div>
 
             <button
+              type="button"
               onClick={() => navigate("score-history")}
               className="text-xs font-semibold text-[#0D2D52] hover:underline"
             >
@@ -573,36 +474,32 @@ export default function DashboardPage({ navigate }: Props) {
 
           {trendData.length > 0 ? (
             <>
-              <div className="flex items-end gap-2 h-16">
+              <div className="flex items-end gap-2 h-20">
                 {trendData.map((item, index) => {
-                  const scores = trendData.map((entry) => entry.score);
+                  const scores = trendData.map(
+                    (entry) => entry.score
+                  );
 
                   const minScore = Math.min(...scores, 0);
-                  const maxTrendScore = Math.max(...scores, maxScore);
+                  const maxScore = Math.max(...scores, 850);
+                  const range = maxScore - minScore || 1;
 
-                  const range =
-                    maxTrendScore - minScore || 1;
-
-                  const pct =
+                  const height =
                     ((item.score - minScore) / range) * 100;
-
-                  const isLast =
-                    index === trendData.length - 1;
 
                   return (
                     <div
-                      key={item._id}
-                      className="flex-1 flex flex-col items-center gap-1"
+                      key={item._id || `${item.createdAt}-${index}`}
+                      className="flex-1 h-full flex items-end"
                     >
                       <div
-                        className={`w-full rounded-t-md transition-all ${
-                          isLast
+                        className={`w-full rounded-t-md ${
+                          index === trendData.length - 1
                             ? "bg-[#0D2D52]"
                             : "bg-[#E2EAF2]"
                         }`}
                         style={{
-                          height: `${Math.max(pct, 8)}%`,
-                          minHeight: 4,
+                          height: `${Math.max(height, 8)}%`,
                         }}
                         title={`${item.score} points`}
                       />
@@ -612,10 +509,10 @@ export default function DashboardPage({ navigate }: Props) {
               </div>
 
               <div className="flex justify-between mt-2">
-                {trendData.map((item) => (
+                {trendData.map((item, index) => (
                   <p
-                    key={item._id}
-                    className="text-xs text-[#94A3B8] flex-1 text-center"
+                    key={item._id || `${item.createdAt}-${index}`}
+                    className="text-[10px] text-[#94A3B8] flex-1 text-center"
                   >
                     {new Intl.DateTimeFormat("en-GB", {
                       month: "short",
@@ -625,21 +522,19 @@ export default function DashboardPage({ navigate }: Props) {
               </div>
             </>
           ) : (
-            <div className="py-6 text-center">
-              <p className="text-sm text-[#64748B]">
-                Your score history will appear here as your profile is
-                updated.
-              </p>
-            </div>
+            <p className="py-6 text-center text-sm text-[#64748B]">
+              Your score history will appear here as your profile
+              is updated.
+            </p>
           )}
         </Card>
 
-        {/* Prototype information */}
         <div className="mt-6 flex items-center justify-center gap-2">
           <div className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
 
           <p className="text-xs text-[#94A3B8]">
-            TrustID Profile · {initials || "User"} · {scorePct.toFixed(2)}
+            TrustID Profile · {initials || "User"} ·{" "}
+            {((currentScore / 850) * 100).toFixed(2)}%
           </p>
         </div>
       </div>

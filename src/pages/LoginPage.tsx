@@ -39,22 +39,13 @@ export default function LoginPage({ navigate }: Props) {
         password,
       });
 
-      /*
-       * Route the customer according to their actual
-       * onboarding and consent state.
-       */
-
       if (!user.onboardingCompleted) {
         navigate("onboarding");
-        return;
-      }
-
-      if (!user.consent?.granted) {
+      } else if (!user.consent?.granted) {
         navigate("consent");
-        return;
+      } else {
+        navigate("dashboard");
       }
-
-      navigate("dashboard");
     } catch (err) {
       setError(
         err instanceof Error

@@ -9,8 +9,12 @@ import {
 import {
   getTrustInsights,
   getTrustProfile,
-  TrustProfile,
+  type TrustProfile,
 } from "../services/financialProfileService";
+
+interface Props {
+  navigate: (page: string) => void;
+}
 
 interface GrowthRecommendation {
   id: number;
@@ -23,7 +27,7 @@ interface GrowthRecommendation {
   impact: "High" | "Medium" | "Low";
 }
 
-function getFactorLabel(factor: string): string {
+function getFactorLabel(factor: string) {
   const labels: Record<string, string> = {
     incomeConsistency: "Income Consistency",
     savingsBehaviour: "Savings Behaviour",
@@ -35,7 +39,7 @@ function getFactorLabel(factor: string): string {
   return labels[factor] || factor;
 }
 
-function getFactorIcon(factor: string): string {
+function getFactorIcon(factor: string) {
   const icons: Record<string, string> = {
     incomeConsistency: "💼",
     savingsBehaviour: "💰",
@@ -68,15 +72,13 @@ function getImpactVariant(
 
 function buildRecommendation(
   factorKey: string,
-  factorScore: number,
-  factorMax: number,
+  score: number,
+  max: number,
   opportunity: string,
   index: number
 ): GrowthRecommendation {
   const percentage =
-    factorMax > 0 ? Math.round((factorScore / factorMax) * 100) : 0;
-
-  const factor = getFactorLabel(factorKey);
+    max > 0 ? Math.round((score / max) * 100) : 0;
 
   const templates: Record<
     string,
@@ -141,33 +143,35 @@ function buildRecommendation(
   };
 
   const template = templates[factorKey] || {
-    title: `Improve your ${factor}`,
+    title: `Improve your ${getFactorLabel(factorKey)}`,
     current: opportunity,
     action:
       "Maintain consistent financial habits and focus on the areas highlighted in your Trust Profile.",
     benefit:
-      `Improving ${factor} can contribute positively to your Trust Score.`,
+      "Consistent positive financial behaviour can contribute positively to your Trust Score.",
   };
 
   return {
     id: index + 1,
-    factor,
+    factor: getFactorLabel(factorKey),
     icon: getFactorIcon(factorKey),
     title: template.title,
     currentBehaviour: template.current,
     recommendedAction: template.action,
     potentialBenefit: template.benefit,
-    impact: getImpact(factorScore, factorMax),
+    impact: getImpact(score, max),
   };
 }
 
 export default function FinancialGrowthPage({
   navigate,
-}: {
-  navigate: (page: string) => void;
-}) {
-  const [profile, setProfile] = useState<TrustProfile | null>(null);
-  const [opportunities, setOpportunities] = useState<string[]>([]);
+}: Props) {
+  const [profile, setProfile] = useState<TrustProfile | null>(
+    null
+  );
+  const [opportunities, setOpportunities] = useState<string[]>(
+    []
+  );
   const [recommendations, setRecommendations] = useState<
     GrowthRecommendation[]
   >([]);
@@ -175,38 +179,41 @@ export default function FinancialGrowthPage({
   const [error, setError] = useState("");
 
   useEffect(() => {
+    let mounted = true;
+
     async function loadGrowthData() {
       try {
         setLoading(true);
         setError("");
 
-        const [trustProfile, insights] = await Promise.all([
+        const [profileData, insights] = await Promise.all([
           getTrustProfile(),
           getTrustInsights(),
         ]);
 
-        if (!trustProfile) {
+        if (!mounted) return;
+
+        if (!profileData) {
           throw new Error(
             "Your Trust Profile is not available yet."
           );
         }
 
-        setProfile(trustProfile);
+        setProfile(profileData);
         setOpportunities(insights.opportunities || []);
 
-        const factorEntries = Object.entries(trustProfile.factors);
+        const entries = Object.entries(profileData.factors);
 
-        const generatedRecommendations = factorEntries
-          .filter(([factorKey, factor]) =>
-            insights.opportunities.some(
-              (opportunity) =>
-                opportunity.toLowerCase() ===
-                getFactorLabel(factorKey).toLowerCase()
-            )
-          )
-          .map(([factorKey, factor], index) =>
+        const generated = entries
+          .filter(([, factor]) => {
+            return (
+              factor.max > 0 &&
+              factor.score / factor.max < 0.8
+            );
+          })
+          .map(([key, factor], index) =>
             buildRecommendation(
-              factorKey,
+              key,
               factor.score,
               factor.max,
               insights.opportunities[index] || "",
@@ -214,36 +221,46 @@ export default function FinancialGrowthPage({
             )
           );
 
-        setRecommendations(generatedRecommendations);
+        setRecommendations(generated);
       } catch (err) {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Unable to load your growth recommendations."
-        );
+        if (mounted) {
+          setError(
+            err instanceof Error
+              ? err.message
+              : "Unable to load your growth recommendations."
+          );
+        }
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
 
     loadGrowthData();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const overallProgress = useMemo(() => {
     if (!profile) return 0;
+
     return Math.round((profile.totalScore / 850) * 100);
   }, [profile]);
 
   if (loading) {
     return (
-      <CustomerLayout current="financial-growth" navigate={navigate}>
-        <div className="p-6 lg:p-10 max-w-7xl mx-auto">
-          <div className="animate-pulse space-y-6">
-            <div className="h-8 w-64 bg-slate-200 rounded" />
-            <div className="h-4 w-96 bg-slate-200 rounded" />
-            <div className="h-40 bg-slate-200 rounded-2xl" />
-            <div className="h-64 bg-slate-200 rounded-2xl" />
-          </div>
+      <CustomerLayout
+        current="financial-growth"
+        navigate={navigate}
+      >
+        <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-6 animate-pulse">
+          <div className="h-8 w-64 bg-slate-200 rounded" />
+          <div className="h-4 w-96 bg-slate-200 rounded" />
+          <div className="h-40 bg-slate-200 rounded-2xl" />
+          <div className="h-64 bg-slate-200 rounded-2xl" />
         </div>
       </CustomerLayout>
     );
@@ -251,23 +268,26 @@ export default function FinancialGrowthPage({
 
   if (error || !profile) {
     return (
-      <CustomerLayout current="financial-growth" navigate={navigate}>
+      <CustomerLayout
+        current="financial-growth"
+        navigate={navigate}
+      >
         <div className="p-6 lg:p-10 max-w-4xl mx-auto">
           <Card className="p-8 text-center">
             <div className="w-14 h-14 rounded-full bg-[#E8F0F7] flex items-center justify-center mx-auto mb-4 text-2xl">
               📈
             </div>
 
-            <h1 className="text-xl font-semibold text-[#0D2D52] mb-2">
+            <h1 className="text-xl font-semibold text-[#0D2D52]">
               Financial Growth
             </h1>
 
-            <p className="text-sm text-slate-500 mb-6">
+            <p className="text-sm text-slate-500 mt-2 mb-6">
               {error ||
                 "Your Trust Profile needs to be generated before we can show growth recommendations."}
             </p>
 
-            <Button onClick={() => navigate("analysis")}>
+            <Button onClick={() => navigate("connect")}>
               Start Analysis
             </Button>
           </Card>
@@ -277,33 +297,42 @@ export default function FinancialGrowthPage({
   }
 
   return (
-    <CustomerLayout current="financial-growth" navigate={navigate}>
+    <CustomerLayout
+      current="financial-growth"
+      navigate={navigate}
+    >
       <div className="p-6 lg:p-10 max-w-7xl mx-auto space-y-8">
-        {/* Header */}
         <div>
-          <p className="text-sm font-medium text-[#2563A0] mb-2">
+          <button
+            type="button"
+            onClick={() => navigate("dashboard")}
+            className="text-sm text-[#64748B] hover:text-[#0D2D52]"
+          >
+            ← Back to dashboard
+          </button>
+
+          <p className="text-sm font-medium text-[#2563A0] mt-6">
             Financial Growth
           </p>
 
-          <h1 className="text-2xl lg:text-3xl font-bold text-[#0D2D52]">
+          <h1 className="text-2xl lg:text-3xl font-bold text-[#0D2D52] mt-1">
             Build a stronger financial profile
           </h1>
 
           <p className="text-slate-500 mt-2 max-w-2xl">
-            Your recommendations are based on the financial behaviours
-            reflected in your Trust Profile.
+            Your recommendations are based on the financial
+            behaviours reflected in your Trust Profile.
           </p>
         </div>
 
-        {/* Current Score */}
         <Card className="p-6 lg:p-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
             <div>
-              <p className="text-sm text-slate-500 mb-2">
+              <p className="text-sm text-slate-500">
                 Current Trust Score
               </p>
 
-              <div className="flex items-end gap-3">
+              <div className="flex items-end gap-3 mt-2">
                 <span className="text-4xl font-bold text-[#0D2D52]">
                   {profile.totalScore}
                 </span>
@@ -329,15 +358,10 @@ export default function FinancialGrowthPage({
                   {profile.band}
                 </Badge>
               </div>
-
-              <p className="text-sm text-slate-500 mt-3">
-                Keep building positive financial habits to strengthen
-                your profile.
-              </p>
             </div>
 
             <div className="w-full lg:w-72">
-              <div className="flex items-center justify-between mb-2 text-sm">
+              <div className="flex justify-between mb-2 text-sm">
                 <span className="text-slate-500">
                   Profile strength
                 </span>
@@ -355,16 +379,15 @@ export default function FinancialGrowthPage({
           </div>
         </Card>
 
-        {/* Opportunities */}
-        <div>
+        <section>
           <div className="mb-5">
             <h2 className="text-xl font-semibold text-[#0D2D52]">
               Your growth opportunities
             </h2>
 
             <p className="text-sm text-slate-500 mt-1">
-              These are the areas with the greatest opportunity to
-              strengthen your Trust Profile.
+              Focus on the areas below to strengthen your Trust
+              Profile.
             </p>
           </div>
 
@@ -372,13 +395,13 @@ export default function FinancialGrowthPage({
             <Card className="p-8 text-center">
               <div className="text-3xl mb-3">🎉</div>
 
-              <h3 className="font-semibold text-[#0D2D52] mb-2">
+              <h3 className="font-semibold text-[#0D2D52]">
                 You are doing well
               </h3>
 
-              <p className="text-sm text-slate-500">
-                No major improvement areas were identified from your
-                current financial behaviour.
+              <p className="text-sm text-slate-500 mt-2">
+                No major improvement areas were identified from
+                your current financial behaviour.
               </p>
             </Card>
           ) : (
@@ -395,11 +418,11 @@ export default function FinancialGrowthPage({
                       </div>
 
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wide text-[#2563A0] mb-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-[#2563A0]">
                           {recommendation.factor}
                         </p>
 
-                        <h3 className="text-lg font-semibold text-[#0D2D52]">
+                        <h3 className="text-lg font-semibold text-[#0D2D52] mt-1">
                           {recommendation.title}
                         </h3>
                       </div>
@@ -449,59 +472,52 @@ export default function FinancialGrowthPage({
               ))}
             </div>
           )}
-        </div>
+        </section>
 
-        {/* Strengths */}
-        {profile.factors && (
-          <Card className="p-6 lg:p-8">
-            <div className="mb-6">
-              <h2 className="text-xl font-semibold text-[#0D2D52]">
-                Your current strengths
-              </h2>
+        <Card className="p-6 lg:p-8">
+          <h2 className="text-xl font-semibold text-[#0D2D52]">
+            Your current strengths
+          </h2>
 
-              <p className="text-sm text-slate-500 mt-1">
-                Keep maintaining these behaviours as you work on the
-                areas above.
-              </p>
-            </div>
+          <p className="text-sm text-slate-500 mt-1 mb-6">
+            Keep maintaining strong financial behaviours.
+          </p>
 
-            <div className="space-y-5">
-              {Object.entries(profile.factors)
-                .filter(({ 1: factor }) => {
-                  return (
-                    factor.max > 0 &&
-                    factor.score / factor.max >= 0.8
-                  );
-                })
-                .map(([factorKey, factor]) => {
-                  const percentage = Math.round(
-                    (factor.score / factor.max) * 100
-                  );
+          <div className="space-y-5">
+            {Object.entries(profile.factors)
+              .filter(([, factor]) => {
+                return (
+                  factor.max > 0 &&
+                  factor.score / factor.max >= 0.8
+                );
+              })
+              .map(([key, factor]) => {
+                const percentage = Math.round(
+                  (factor.score / factor.max) * 100
+                );
 
-                  return (
-                    <div key={factorKey}>
-                      <div className="flex items-center justify-between mb-2">
-                        <span className="text-sm font-medium text-[#0D2D52]">
-                          {getFactorLabel(factorKey)}
-                        </span>
+                return (
+                  <div key={key}>
+                    <div className="flex justify-between mb-2">
+                      <span className="text-sm font-medium text-[#0D2D52]">
+                        {getFactorLabel(key)}
+                      </span>
 
-                        <span className="text-sm font-semibold text-[#2563A0]">
-                          {percentage}%
-                        </span>
-                      </div>
-
-                      <ProgressBar
-                        value={factor.score}
-                        max={factor.max}
-                      />
+                      <span className="text-sm font-semibold text-[#2563A0]">
+                        {percentage}%
+                      </span>
                     </div>
-                  );
-                })}
-            </div>
-          </Card>
-        )}
 
-        {/* CTA */}
+                    <ProgressBar
+                      value={factor.score}
+                      max={factor.max}
+                    />
+                  </div>
+                );
+              })}
+          </div>
+        </Card>
+
         <Card className="p-6 lg:p-8 bg-[#0D2D52] border-0">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
             <div>
