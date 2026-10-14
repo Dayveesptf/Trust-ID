@@ -1,690 +1,319 @@
+import { useEffect, useMemo, useState } from "react";
 import {
-  useEffect,
-  useMemo,
-  useState,
-} from "react";
-
-import {
+  AlertCircle,
   ArrowRight,
+  CheckCircle2,
+  Clock3,
+  FileSearch,
   RefreshCw,
   Search,
+  ShieldCheck,
   Users,
 } from "lucide-react";
-
+import { BankLayout } from "../components/Layout";
+import { Avatar, Badge, Button, Card } from "../components/ui";
 import {
-  Avatar,
-  Badge,
-  Button,
-  Card,
-} from "../components/ui";
-
-import {
-  EcobankCustomer,
   getEcobankCustomers,
+  getEcobankDashboardSummary,
+  type EcobankCustomer,
+  type EcobankDashboardSummary,
+  type ReviewStatus,
 } from "../services/ecobankService";
 
-import { BankLayout } from "../components/Layout";
-
-interface CustomerOverviewPageProps {
-  navigate: (
-    screen: string,
-    params?: {
-      customerId?: string;
-    }
-  ) => void;
+interface Props {
+  navigate: (screen: string, params?: { customerId?: string }) => void;
 }
 
-/* ============================================================= */
-/* Helpers                                                        */
-/* ============================================================= */
+type ReviewFilter = "ALL" | ReviewStatus;
 
-function getBandVariant(
-  band: string
-):
-  | "success"
-  | "good"
-  | "fair"
-  | "warning"
-  | "info"
-  | "neutral" {
+const FILTERS: { value: ReviewFilter; label: string }[] = [
+  { value: "ALL", label: "All shared profiles" },
+  { value: "NOT_REVIEWED", label: "Awaiting review" },
+  { value: "IN_REVIEW", label: "In review" },
+  { value: "NEEDS_MORE_INFORMATION", label: "More information" },
+  { value: "REFERRED_TO_CREDIT_TEAM", label: "Referred to credit team" },
+  { value: "REVIEW_COMPLETED", label: "TrustID review completed" },
+];
+
+function reviewLabel(status?: ReviewStatus): string {
+  switch (status) {
+    case "IN_REVIEW": return "In review";
+    case "NEEDS_MORE_INFORMATION": return "More information needed";
+    case "REFERRED_TO_CREDIT_TEAM": return "Referred to credit team";
+    case "REVIEW_COMPLETED": return "TrustID review completed";
+    default: return "Awaiting review";
+  }
+}
+
+function reviewVariant(status?: ReviewStatus): "success" | "good" | "fair" | "warning" | "info" | "neutral" {
+  switch (status) {
+    case "IN_REVIEW": return "info";
+    case "NEEDS_MORE_INFORMATION": return "warning";
+    case "REFERRED_TO_CREDIT_TEAM": return "fair";
+    case "REVIEW_COMPLETED": return "success";
+    default: return "neutral";
+  }
+}
+
+function bandVariant(band?: string): "success" | "good" | "fair" | "warning" | "info" | "neutral" {
   switch (band) {
-    case "Excellent":
-      return "success";
-
+    case "Excellent": return "success";
     case "Strong":
-      return "good";
-
-    case "Good":
-      return "good";
-
-    case "Fair":
-      return "fair";
-
-    case "Developing":
-      return "warning";
-
-    case "Needs Improvement":
-      return "neutral";
-
-    default:
-      return "neutral";
+    case "Good": return "good";
+    case "Fair": return "fair";
+    case "Developing": return "warning";
+    default: return "neutral";
   }
 }
 
-function getInitials(
-  firstName: string,
-  lastName: string
-) {
-  const first = firstName?.charAt(0) || "";
-  const last = lastName?.charAt(0) || "";
-
-  return `${first}${last}`.toUpperCase();
+function formatDate(value?: string | null): string {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-NG", { day: "numeric", month: "short", year: "numeric" });
 }
 
-function formatDate(date?: string) {
-  if (!date) {
-    return "—";
-  }
-
-  const parsed = new Date(date);
-
-  if (Number.isNaN(parsed.getTime())) {
-    return "—";
-  }
-
-  return parsed.toLocaleDateString("en-NG", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+function initials(customer: EcobankCustomer): string {
+  return `${customer.firstName?.[0] || ""}${customer.lastName?.[0] || ""}`.toUpperCase();
 }
 
-/* ============================================================= */
-/* Component                                                      */
-/* ============================================================= */
+export default function CustomerOverviewPage({ navigate }: Props) {
+  const [customers, setCustomers] = useState<EcobankCustomer[]>([]);
+  const [summary, setSummary] = useState<EcobankDashboardSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<ReviewFilter>("ALL");
 
-export default function CustomerOverviewPage({
-  navigate,
-}: CustomerOverviewPageProps) {
-  const [customers, setCustomers] =
-    useState<EcobankCustomer[]>([]);
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [error, setError] =
-    useState("");
-
-  const [search, setSearch] =
-    useState("");
-
-  /* =========================================================== */
-  /* Load customers                                               */
-  /* =========================================================== */
-
-  async function loadCustomers() {
+  async function loadWorkspace() {
+    setLoading(true);
+    setError("");
     try {
-      setLoading(true);
-      setError("");
-
-      const data =
-        await getEcobankCustomers();
-
-      setCustomers(
-        Array.isArray(data)
-          ? data
-          : []
-      );
+      const [customerData, summaryData] = await Promise.all([
+        getEcobankCustomers(),
+        getEcobankDashboardSummary(),
+      ]);
+      setCustomers(Array.isArray(customerData) ? customerData : []);
+      setSummary(summaryData);
     } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Unable to load customer information."
-      );
+      setError(err instanceof Error ? err.message : "Unable to load the Ecobank review workspace.");
     } finally {
       setLoading(false);
     }
   }
 
   useEffect(() => {
-    loadCustomers();
+    void loadWorkspace();
   }, []);
 
-  /* =========================================================== */
-  /* Search                                                        */
-  /* =========================================================== */
+  const visibleCustomers = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return customers.filter((customer) => {
+      const matchesQuery = !query || [
+        `${customer.firstName} ${customer.lastName}`,
+        customer.email,
+        customer.phone,
+        customer._id,
+      ].some((value) => (value || "").toLowerCase().includes(query));
+      const matchesFilter = filter === "ALL" || (customer.review?.status || "NOT_REVIEWED") === filter;
+      return matchesQuery && matchesFilter;
+    });
+  }, [customers, search, filter]);
 
-  const filteredCustomers = useMemo(() => {
-    const query =
-      search.trim().toLowerCase();
-
-    if (!query) {
-      return customers;
-    }
-
-    return customers.filter(
-      (customer) => {
-        const fullName =
-          `${customer.firstName} ${customer.lastName}`
-            .toLowerCase();
-
-        const email =
-          customer.email?.toLowerCase() || "";
-
-        const phone =
-          customer.phone?.toLowerCase() || "";
-
-        const id =
-          customer._id?.toLowerCase() || "";
-
-        return (
-          fullName.includes(query) ||
-          email.includes(query) ||
-          phone.includes(query) ||
-          id.includes(query)
-        );
-      }
-    );
-  }, [customers, search]);
-
-  /* =========================================================== */
-  /* Statistics                                                    */
-  /* =========================================================== */
-
-  const scoredCustomers =
-    customers.filter(
-      (customer) =>
-        customer.trustProfile !== null
-    );
-
-  const averageScore =
-    scoredCustomers.length > 0
-      ? Math.round(
-          scoredCustomers.reduce(
-            (sum, customer) =>
-              sum +
-              (customer.trustProfile
-                ?.score || 0),
-            0
-          ) /
-            scoredCustomers.length
-        )
-      : 0;
-
-  const strongCustomers =
-    scoredCustomers.filter(
-      (customer) =>
-        (customer.trustProfile?.score ||
-          0) >= 700
-    ).length;
-
-  const unscoredCustomers =
-    customers.length -
-    scoredCustomers.length;
-
-  /* =========================================================== */
-  /* Render                                                        */
-  /* =========================================================== */
+  const followUpCount = (summary?.reviews?.NEEDS_MORE_INFORMATION || 0)
+    + (summary?.reviews?.REFERRED_TO_CREDIT_TEAM || 0);
 
   return (
-  <BankLayout
-  current="customer-overview"
-  navigate={navigate}
-  >
-    <div className="min-h-screen bg-[#F8FAFB]">
-
-      {/* ======================================================= */}
-      {/* Header                                                    */}
-      {/* ======================================================= */}
-
-      <div className="border-b border-[#E2EAF2] bg-white">
-        <div className="mx-auto max-w-7xl px-6 py-6 lg:px-8">
-
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-
-            <div>
-              <p className="text-sm font-medium text-[#2563A0]">
-                Ecobank Decision Support
-              </p>
-
-              <h1 className="mt-1 text-2xl font-bold text-[#0D2D52]">
-                Customer Overview
-              </h1>
-
-              <p className="mt-1 text-sm text-[#64748B]">
-                Review TrustID customer profiles
-                and financial behaviour.
-              </p>
-            </div>
-
-            <Button
-              variant="secondary"
-              onClick={loadCustomers}
-              disabled={loading}
-            >
-              <RefreshCw
-                size={16}
-                className={
-                  loading
-                    ? "animate-spin"
-                    : ""
-                }
-              />
-
-              {loading
-                ? "Refreshing..."
-                : "Refresh"}
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* ======================================================= */}
-      {/* Main                                                       */}
-      {/* ======================================================= */}
-
-      <main className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-
-        {/* ===================================================== */}
-        {/* Stats                                                   */}
-        {/* ===================================================== */}
-
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-
-          {/* Total */}
-          <Card className="p-5">
-            <div className="flex items-center gap-3">
-
-              <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#EAF2F8]">
-                <Users
-                  size={20}
-                  className="text-[#0D2D52]"
-                />
-              </div>
-
+    <BankLayout current="customer-overview" navigate={navigate}>
+      <div className="min-h-screen bg-[#F8FAFB]">
+        <header className="border-b border-[#E2EAF2] bg-white">
+          <div className="mx-auto max-w-7xl px-5 py-6 sm:px-8">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
-                <p className="text-sm text-[#64748B]">
-                  Total Customers
-                </p>
-
-                <p className="text-2xl font-bold text-[#0D2D52]">
-                  {loading
-                    ? "—"
-                    : customers.length}
+                <p className="text-sm font-semibold text-[#2563A0]">Ecobank · TrustID decision support</p>
+                <h1 className="mt-1 text-2xl font-bold tracking-tight text-[#0D2D52]">Shared customer profiles</h1>
+                <p className="mt-2 max-w-2xl text-sm leading-6 text-[#64748B]">
+                  Review explainable financial-behaviour signals that customers have chosen to share. TrustID adds context to Ecobank's existing lending workflow; it does not approve or reject loans.
                 </p>
               </div>
+              <Button variant="secondary" onClick={() => void loadWorkspace()} disabled={loading}>
+                <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                {loading ? "Refreshing…" : "Refresh workspace"}
+              </Button>
             </div>
-          </Card>
-
-          {/* Average */}
-          <Card className="p-5">
-            <p className="text-sm text-[#64748B]">
-              Average Trust Score
-            </p>
-
-            <p className="mt-1 text-2xl font-bold text-[#0D2D52]">
-              {loading
-                ? "—"
-                : `${averageScore} / 850`}
-            </p>
-
-            {!loading &&
-              scoredCustomers.length > 0 && (
-                <p className="mt-1 text-xs text-[#94A3B8]">
-                  Based on{" "}
-                  {scoredCustomers.length}{" "}
-                  analysed profiles
-                </p>
-              )}
-          </Card>
-
-          {/* Strong */}
-          <Card className="p-5">
-            <p className="text-sm text-[#64748B]">
-              Strong / Excellent
-            </p>
-
-            <p className="mt-1 text-2xl font-bold text-[#0D2D52]">
-              {loading
-                ? "—"
-                : strongCustomers}
-            </p>
-
-            <p className="mt-1 text-xs text-[#94A3B8]">
-              Score 700+
-            </p>
-          </Card>
-
-          {/* Unscored */}
-          <Card className="p-5">
-            <p className="text-sm text-[#64748B]">
-              Awaiting Analysis
-            </p>
-
-            <p className="mt-1 text-2xl font-bold text-[#0D2D52]">
-              {loading
-                ? "—"
-                : unscoredCustomers}
-            </p>
-
-            <p className="mt-1 text-xs text-[#94A3B8]">
-              No Trust Profile yet
-            </p>
-          </Card>
-        </div>
-
-        {/* ===================================================== */}
-        {/* Search                                                   */}
-        {/* ===================================================== */}
-
-        <Card className="mb-6 p-4">
-          <div className="relative">
-
-            <Search
-              size={18}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]"
-            />
-
-            <input
-              type="text"
-              value={search}
-              onChange={(event) =>
-                setSearch(
-                  event.target.value
-                )
-              }
-              placeholder="Search customers by name, email, phone or ID..."
-              className="w-full rounded-xl border border-[#D7E1EA] bg-white py-3 pl-10 pr-4 text-sm text-[#0D2D52] outline-none transition focus:border-[#2563A0] focus:ring-2 focus:ring-[#2563A0]/10"
-            />
           </div>
-        </Card>
+        </header>
 
-        {/* ===================================================== */}
-        {/* Error                                                    */}
-        {/* ===================================================== */}
-
-        {error && (
-          <Card className="mb-6 border border-red-200 bg-red-50 p-5">
-
-            <p className="font-medium text-red-700">
-              Unable to load customers
-            </p>
-
-            <p className="mt-1 text-sm leading-5 text-red-600">
-              {error}
-            </p>
-
-            <Button
-              className="mt-4"
-              variant="secondary"
-              onClick={loadCustomers}
-            >
-              Try Again
-            </Button>
-          </Card>
-        )}
-
-        {/* ===================================================== */}
-        {/* Loading                                                  */}
-        {/* ===================================================== */}
-
-        {loading && (
-          <div className="space-y-3">
-
-            {[1, 2, 3, 4].map(
-              (item) => (
-                <Card
-                  key={item}
-                  className="p-5"
-                >
-                  <div className="animate-pulse">
-
-                    <div className="h-5 w-48 rounded bg-[#E2EAF2]" />
-
-                    <div className="mt-3 h-4 w-64 rounded bg-[#E2EAF2]" />
-
-                    <div className="mt-3 h-4 w-32 rounded bg-[#E2EAF2]" />
-                  </div>
-                </Card>
-              )
-            )}
-          </div>
-        )}
-
-        {/* ===================================================== */}
-        {/* Empty                                                    */}
-        {/* ===================================================== */}
-
-        {!loading &&
-          !error &&
-          filteredCustomers.length === 0 && (
-            <Card className="p-10 text-center">
-
-              <Users
-                size={36}
-                className="mx-auto text-[#94A3B8]"
-              />
-
-              <h3 className="mt-4 font-semibold text-[#0D2D52]">
-                No customers found
-              </h3>
-
-              <p className="mt-1 text-sm text-[#64748B]">
-                {search
-                  ? "Try a different search term."
-                  : "There are currently no TrustID customers to review."}
+        <main className="mx-auto max-w-7xl px-5 py-7 sm:px-8">
+          <div className="mb-6 flex items-start gap-3 rounded-2xl border border-[#C8D9EC] bg-[#EFF5FB] p-4 sm:p-5">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white text-[#0D2D52]">
+              <ShieldCheck size={21} />
+            </div>
+            <div>
+              <p className="font-semibold text-[#0D2D52]">An additional credibility layer, not a replacement system</p>
+              <p className="mt-1 text-sm leading-6 text-[#526579]">
+                Use the profile to understand income consistency, savings, repayment behaviour, cash-flow stability and financial discipline alongside KYC, credit checks, documents and Ecobank's normal underwriting process.
               </p>
+            </div>
+          </div>
 
-              {search && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    setSearch("")
-                  }
-                  className="mt-4 text-sm font-semibold text-[#2563A0] hover:underline"
-                >
-                  Clear search
-                </button>
-              )}
+          <div className="mb-7 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <Card className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#64748B]">Profiles shared</p>
+                <Users size={19} className="text-[#2563A0]" />
+              </div>
+              <p className="mt-2 text-3xl font-bold text-[#0D2D52]">{loading ? "—" : summary?.sharedProfiles ?? customers.length}</p>
+              <p className="mt-1 text-xs leading-5 text-[#94A3B8]">Customer-controlled sharing</p>
             </Card>
-          )}
+            <Card className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#64748B]">Awaiting review</p>
+                <Clock3 size={19} className="text-amber-600" />
+              </div>
+              <p className="mt-2 text-3xl font-bold text-[#0D2D52]">{loading ? "—" : summary?.reviews?.NOT_REVIEWED ?? 0}</p>
+              <p className="mt-1 text-xs leading-5 text-[#94A3B8]">Shared profiles not yet reviewed</p>
+            </Card>
+            <Card className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#64748B]">Review in progress</p>
+                <FileSearch size={19} className="text-[#2563A0]" />
+              </div>
+              <p className="mt-2 text-3xl font-bold text-[#0D2D52]">{loading ? "—" : summary?.reviews?.IN_REVIEW ?? 0}</p>
+              <p className="mt-1 text-xs leading-5 text-[#94A3B8]">Officer workflow status</p>
+            </Card>
+            <Card className="p-5">
+              <div className="flex items-center justify-between">
+                <p className="text-sm text-[#64748B]">Follow-up / referral</p>
+                <AlertCircle size={19} className="text-orange-600" />
+              </div>
+              <p className="mt-2 text-3xl font-bold text-[#0D2D52]">{loading ? "—" : followUpCount}</p>
+              <p className="mt-1 text-xs leading-5 text-[#94A3B8]">Needs context or existing credit-team review</p>
+            </Card>
+          </div>
 
-        {/* ===================================================== */}
-        {/* Customer table                                           */}
-        {/* ===================================================== */}
+          <div className="mb-6 grid gap-4 lg:grid-cols-[1fr_300px]">
+            <Card className="p-4">
+              <label className="relative block">
+                <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
+                <input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search shared profiles by name, email, phone or ID…"
+                  className="w-full rounded-xl border border-[#D7E1EA] bg-white py-3 pl-10 pr-4 text-sm text-[#0D2D52] outline-none focus:border-[#2563A0] focus:ring-2 focus:ring-[#2563A0]/10"
+                />
+              </label>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {FILTERS.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    onClick={() => setFilter(item.value)}
+                    className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${filter === item.value ? "border-[#0D2D52] bg-[#0D2D52] text-white" : "border-[#D7E1EA] bg-white text-[#64748B] hover:border-[#A8BED5] hover:text-[#0D2D52]"}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </Card>
 
-        {!loading &&
-          filteredCustomers.length > 0 && (
-            <Card className="overflow-hidden">
+            <Card className="p-5">
+              <p className="text-xs font-semibold uppercase tracking-wider text-[#94A3B8]">Workspace snapshot</p>
+              <div className="mt-3 flex items-center justify-between gap-4">
+                <span className="text-sm text-[#64748B]">Average TrustID score</span>
+                <strong className="text-lg text-[#0D2D52]">{loading ? "—" : `${summary?.averageScore || 0}/850`}</strong>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-[#94A3B8]">Based on profiles with an available score. A score is not a lending decision.</p>
+            </Card>
+          </div>
 
-              <div className="overflow-x-auto">
-
-                <table className="w-full min-w-[900px]">
-
-                  <thead>
-                    <tr className="border-b border-[#E2EAF2] bg-[#F8FAFB] text-left">
-
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
-                        Customer
-                      </th>
-
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
-                        Contact
-                      </th>
-
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
-                        Trust Score
-                      </th>
-
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
-                        Profile
-                      </th>
-
-                      <th className="px-6 py-4 text-xs font-semibold uppercase tracking-wide text-[#64748B]">
-                        Joined
-                      </th>
-
-                      <th className="px-6 py-4" />
-                    </tr>
-                  </thead>
-
-                  <tbody>
-
-                    {filteredCustomers.map(
-                      (customer) => {
-                        const profile =
-                          customer.trustProfile;
-
-                        return (
-                          <tr
-                            key={
-                              customer._id
-                            }
-                            className="border-b border-[#E2EAF2] last:border-0 hover:bg-[#FAFCFD] transition"
-                          >
-
-                            {/* Customer */}
-                            <td className="px-6 py-5">
-
-                              <div className="flex items-center gap-3">
-
-                                <Avatar
-                                  initials={getInitials(
-                                    customer.firstName,
-                                    customer.lastName
-                                  )}
-                                />
-
-                                <div>
-                                  <p className="font-semibold text-[#0D2D52]">
-                                    {
-                                      customer.firstName
-                                    }{" "}
-                                    {
-                                      customer.lastName
-                                    }
-                                  </p>
-
-                                  <p className="text-xs text-[#64748B]">
-                                    ID:{" "}
-                                    {customer._id.slice(
-                                      -8
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-                            </td>
-
-                            {/* Contact */}
-                            <td className="px-6 py-5">
-
-                              <p className="text-sm text-[#334155]">
-                                {
-                                  customer.email
-                                }
-                              </p>
-
-                              <p className="mt-1 text-xs text-[#64748B]">
-                                {
-                                  customer.phone
-                                }
-                              </p>
-                            </td>
-
-                            {/* Score */}
-                            <td className="px-6 py-5">
-
-                              {profile ? (
-                                <p className="font-bold text-[#0D2D52]">
-                                  {
-                                    profile.score
-                                  }
-
-                                  <span className="ml-1 text-xs font-normal text-[#94A3B8]">
-                                    / 850
-                                  </span>
-                                </p>
-                              ) : (
-                                <span className="text-sm text-[#94A3B8]">
-                                  Not available
-                                </span>
-                              )}
-                            </td>
-
-                            {/* Band */}
-                            <td className="px-6 py-5">
-
-                              {profile ? (
-                                <Badge
-                                  variant={getBandVariant(
-                                    profile.band
-                                  )}
-                                >
-                                  {
-                                    profile.band
-                                  }
-                                </Badge>
-                              ) : (
-                                <Badge variant="neutral">
-                                  Not analysed
-                                </Badge>
-                              )}
-                            </td>
-
-                            {/* Joined */}
-                            <td className="px-6 py-5 text-sm text-[#64748B]">
-                              {formatDate(
-                                customer.createdAt
-                              )}
-                            </td>
-
-                            {/* Action */}
-                            <td className="px-6 py-5 text-right">
-
-                              <Button
-                                variant="ghost"
-                                onClick={() =>
-                                  navigate(
-                                    "customer-detail",
-                                    {
-                                      customerId:
-                                        customer._id,
-                                    }
-                                  )
-                                }
-                              >
-                                View Profile
-
-                                <ArrowRight
-                                  size={16}
-                                />
-                              </Button>
-                            </td>
-                          </tr>
-                        );
-                      }
-                    )}
-                  </tbody>
-                </table>
+          {error && (
+            <Card className="mb-6 border-red-200 bg-red-50 p-5">
+              <div className="flex items-start gap-3">
+                <AlertCircle size={20} className="mt-0.5 text-red-600" />
+                <div>
+                  <p className="font-semibold text-red-800">Workspace could not be loaded</p>
+                  <p className="mt-1 text-sm leading-6 text-red-700">{error}</p>
+                  <Button variant="secondary" className="mt-3" onClick={() => void loadWorkspace()}>Try again</Button>
+                </div>
               </div>
             </Card>
           )}
 
-        {/* ===================================================== */}
-        {/* Disclaimer                                               */}
-        {/* ===================================================== */}
+          {loading && (
+            <div className="space-y-3">
+              {[1, 2, 3].map((item) => <Card key={item} className="animate-pulse p-6"><div className="h-5 w-48 rounded bg-[#E2EAF2]" /><div className="mt-3 h-4 w-72 rounded bg-[#F1F5F9]" /></Card>)}
+            </div>
+          )}
 
-        <div className="mt-6 rounded-xl border border-[#E2EAF2] bg-white px-5 py-4">
-          <p className="text-center text-xs leading-5 text-[#94A3B8]">
-            TrustID provides decision-support
-            information based on simulated
-            financial behaviour data. Ecobank
-            retains full responsibility for lending
-            decisions.
-          </p>
-        </div>
-      </main>
-    </div>
+          {!loading && !error && visibleCustomers.length === 0 && (
+            <Card className="p-10 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-[#EFF4F9] text-[#0D2D52]"><Users size={23} /></div>
+              <h2 className="mt-4 font-semibold text-[#0D2D52]">{customers.length === 0 ? "No profiles have been shared yet" : "No profiles match this view"}</h2>
+              <p className="mx-auto mt-2 max-w-lg text-sm leading-6 text-[#64748B]">
+                {customers.length === 0
+                  ? "A customer first checks their own TrustID profile and then chooses Share with Ecobank. For the competition walkthrough, run the demo seed script described in the setup notes."
+                  : "Try another search term or review status filter."}
+              </p>
+              {(search || filter !== "ALL") && <Button variant="secondary" className="mt-4" onClick={() => { setSearch(""); setFilter("ALL"); }}>Clear filters</Button>}
+            </Card>
+          )}
+
+          {!loading && visibleCustomers.length > 0 && (
+            <Card padding="none" className="overflow-hidden">
+              <div className="flex flex-col gap-1 border-b border-[#E2EAF2] px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                <div>
+                  <h2 className="font-bold text-[#0D2D52]">Customer review queue</h2>
+                  <p className="mt-1 text-xs text-[#94A3B8]">{visibleCustomers.length} profile{visibleCustomers.length === 1 ? "" : "s"} shown</p>
+                </div>
+                <p className="text-xs text-[#94A3B8]">Demo data is labelled on each profile</p>
+              </div>
+              <div className="divide-y divide-[#EEF2F6]">
+                {visibleCustomers.map((customer) => (
+                  <div key={customer._id} className="flex flex-col gap-4 px-5 py-5 transition hover:bg-[#FBFCFE] sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar initials={initials(customer)} size="md" />
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold text-[#0D2D52]">{customer.firstName} {customer.lastName}</p>
+                        <p className="mt-1 truncate text-sm text-[#64748B]">{customer.email}</p>
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <Badge variant={reviewVariant(customer.review?.status)}>{reviewLabel(customer.review?.status)}</Badge>
+                          {customer.trustProfile?.dataSource === "SIMULATED_DEMO" && <Badge variant="neutral">Simulated data</Badge>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 items-center gap-4 sm:min-w-[310px] sm:grid-cols-[1fr_1fr_auto]">
+                      <div>
+                        <p className="text-xs text-[#94A3B8]">TrustID score</p>
+                        {customer.trustProfile ? (
+                          <div className="mt-1 flex items-center gap-2">
+                            <strong className="text-lg text-[#0D2D52]">{customer.trustProfile.score}<span className="text-xs font-medium text-[#94A3B8]">/850</span></strong>
+                            <Badge variant={bandVariant(customer.trustProfile.band)}>{customer.trustProfile.band}</Badge>
+                          </div>
+                        ) : <p className="mt-1 text-sm font-semibold text-[#64748B]">Not generated</p>}
+                        <p className="mt-1 text-xs text-[#94A3B8]">Updated {formatDate(customer.trustProfile?.generatedAt)}</p>
+                      </div>
+                      <div className="hidden sm:block">
+                        <p className="text-xs text-[#94A3B8]">Shared on</p>
+                        <p className="mt-1 text-sm font-medium text-[#475569]">{formatDate(customer.sharingConsent?.grantedAt)}</p>
+                      </div>
+                      <Button size="sm" onClick={() => navigate("customer-detail", { customerId: customer._id })}>
+                        Open <ArrowRight size={15} />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          <div className="mt-6 flex items-start gap-2 text-xs leading-5 text-[#94A3B8]">
+            <CheckCircle2 size={15} className="mt-0.5 shrink-0" />
+            <p>Use TrustID as supporting information only. Ecobank's existing KYC, credit checks, affordability review and final lending decision remain in place.</p>
+          </div>
+        </main>
+      </div>
     </BankLayout>
   );
 }

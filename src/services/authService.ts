@@ -17,6 +17,12 @@ export interface User {
     grantedAt?: string;
     version: string;
   };
+  sharingConsent?: {
+    granted: boolean;
+    grantedAt?: string | null;
+    revokedAt?: string | null;
+    version?: string;
+  };
   createdAt?: string;
   updatedAt?: string;
 }

@@ -42,7 +42,7 @@ const customerNav = [
 const bankNav = [
   {
     id: "customer-overview",
-    label: "Customer Insights",
+    label: "Lending Review Queue",
     icon: UsersIcon,
   },
 ];

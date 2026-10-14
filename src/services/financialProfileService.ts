@@ -21,6 +21,8 @@ export interface FinancialProfilePayload {
 
 export interface FinancialProfile
   extends FinancialProfilePayload {
+  sourceType?: "SIMULATED_DEMO" | "AUTHORIZED_BANK_CONNECTION" | "STATEMENT_UPLOAD";
+  evidencePeriodMonths?: number;
   _id: string;
   userId: string;
   createdAt?: string;
@@ -42,6 +44,9 @@ export interface TrustProfile {
 
   totalScore: number;
   band: string;
+  dataSource?: "SIMULATED_DEMO" | "AUTHORIZED_BANK_CONNECTION" | "STATEMENT_UPLOAD";
+  evidencePeriodMonths?: number;
+  scoreModelVersion?: string;
 
   factors: {
     incomeConsistency: TrustFactor;
@@ -53,6 +58,7 @@ export interface TrustProfile {
 
   strengths: string[];
   opportunities: string[];
+  recommendations?: string[];
 
   evidence: {
     averageMonthlyInflow: number;

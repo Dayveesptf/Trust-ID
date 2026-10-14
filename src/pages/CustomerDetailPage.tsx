@@ -190,11 +190,14 @@ function TrustSummary({
         </div>
       </div>
 
-      <p className="text-xs text-slate-500 leading-5 mt-4">
-        TrustID provides an explainable view of the
-        customer's financial behaviour. It is intended as
-        decision-support information and not as an automatic
-        lending decision.
+      <div className="mt-4 flex flex-wrap items-center gap-2">
+        <Badge variant={profile.dataSource === "SIMULATED_DEMO" ? "neutral" : "info"}>
+          {profile.dataSource === "SIMULATED_DEMO" ? "Simulated prototype data" : profile.dataSource === "STATEMENT_UPLOAD" ? "Statement upload" : "Authorised bank connection"}
+        </Badge>
+        <span className="text-xs text-slate-400">{profile.evidencePeriodMonths ?? 7} months represented</span>
+      </div>
+      <p className="text-xs text-slate-500 leading-5 mt-3">
+        TrustID provides an explainable view of the customer's financial behaviour. It is intended as decision-support information and not as an automatic lending decision.
       </p>
     </Card>
   );
@@ -356,6 +359,28 @@ useEffect(() => {
                 ? "Onboarding Complete"
                 : "Onboarding Pending"}
             </Badge>
+          </div>
+        </Card>
+
+        <Card className="p-5 mt-6">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Customer sharing and review</p>
+              <div className="mt-2 flex flex-wrap items-center gap-2">
+                <Badge variant={data.customer.sharingConsent?.granted ? "success" : "neutral"}>
+                  {data.customer.sharingConsent?.granted ? "Shared with Ecobank" : "Not shared"}
+                </Badge>
+                <Badge variant={data.review?.status === "REVIEW_COMPLETED" ? "success" : data.review?.status === "IN_REVIEW" ? "info" : data.review?.status === "NEEDS_MORE_INFORMATION" ? "warning" : data.review?.status === "REFERRED_TO_CREDIT_TEAM" ? "fair" : "neutral"}>
+                  {data.review?.status === "REVIEW_COMPLETED" ? "TrustID review completed" : data.review?.status === "IN_REVIEW" ? "In review" : data.review?.status === "NEEDS_MORE_INFORMATION" ? "More information needed" : data.review?.status === "REFERRED_TO_CREDIT_TEAM" ? "Referred to credit team" : "Awaiting review"}
+                </Badge>
+              </div>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Shared on {formatDate(data.customer.sharingConsent?.grantedAt)}. TrustID is an additional source of information, not a loan-decision engine.
+              </p>
+            </div>
+            <Button onClick={() => navigate("decision-support", { customerId: customer._id })}>
+              Open decision support <ArrowRight size={16} />
+            </Button>
           </div>
         </Card>
 

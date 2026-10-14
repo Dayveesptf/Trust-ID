@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ShieldCheck } from "lucide-react";
 import { CustomerLayout } from "../components/Layout";
 import {
   Card,
@@ -7,8 +8,10 @@ import {
   ScoreRing,
   getLevelVariant,
   getLevelColor,
+  Button,
 } from "../components/ui";
 import { useAuth } from "../context/AuthContext";
+import { setEcobankSharingConsent } from "../services/onboardingService";
 import {
   getScoreHistory,
   getTrustProfile,
@@ -56,12 +59,19 @@ function getInitials(firstName?: string, lastName?: string) {
 }
 
 export default function DashboardPage({ navigate }: Props) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
 
   const [profile, setProfile] = useState<TrustProfile | null>(null);
   const [history, setHistory] = useState<ScoreHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [sharingWithEcobank, setSharingWithEcobank] = useState(Boolean(user?.sharingConsent?.granted));
+  const [sharingBusy, setSharingBusy] = useState(false);
+  const [sharingMessage, setSharingMessage] = useState("");
+
+  useEffect(() => {
+    setSharingWithEcobank(Boolean(user?.sharingConsent?.granted));
+  }, [user?.sharingConsent?.granted]);
 
   useEffect(() => {
     let mounted = true;
@@ -343,6 +353,79 @@ export default function DashboardPage({ navigate }: Props) {
               Improve My Profile
             </button>
           </div>
+        </Card>
+
+        <Card className="mb-6 border border-[#D7E5F2]">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#EFF4F9] text-[#0D2D52]">
+              <ShieldCheck size={20} />
+            </div>
+            <div>
+              <div className="flex flex-wrap items-center gap-2">
+                <h2 className="font-bold text-[#0D2D52]">What this may mean before you apply</h2>
+                <Badge variant="info">Readiness insight</Badge>
+              </div>
+              <p className="mt-2 text-sm leading-6 text-[#64748B]">
+                {currentScore >= 700
+                  ? "Your TrustID profile shows relatively strong financial-behaviour signals. You may wish to explore suitable credit options and check the lender's other requirements."
+                  : currentScore >= 600
+                    ? "Your profile shows some positive financial-behaviour signals. Review the areas below and compare them with the lender's requirements before applying."
+                    : currentScore >= 400
+                      ? "Your profile is still developing. Use the recommendations below to strengthen your financial record before exploring credit options."
+                      : "Your current profile has several areas to build on. Focus on consistent income patterns, savings, scheduled repayments and cash-flow stability."}
+              </p>
+              <p className="mt-2 text-xs leading-5 text-[#94A3B8]">
+                This is a financial-readiness indicator, not a loan eligibility result or approval. A lender must still assess affordability, identity, credit history, documents and its own product criteria.
+              </p>
+            </div>
+          </div>
+        </Card>
+
+        {/* Sharing is a separate, optional choice from analysis consent. */}
+        <Card className="mb-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+            <div className="max-w-2xl">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <h2 className="text-base font-bold text-[#0D1F35]">
+                  Share your Trust Profile with Ecobank
+                </h2>
+                <Badge variant={sharingWithEcobank ? "success" : "neutral"}>
+                  {sharingWithEcobank ? "Shared with Ecobank demo" : "Private to you"}
+                </Badge>
+              </div>
+              <p className="text-sm leading-6 text-[#64748B]">
+                Sharing makes this profile visible in the TrustID Ecobank review workspace as an additional source of financial-behaviour insight. It does not submit a loan application, guarantee eligibility, or replace Ecobank's existing checks.
+              </p>
+              {sharingMessage && (
+                <p className={`mt-2 text-sm ${sharingMessage.startsWith("Unable") ? "text-red-600" : "text-emerald-700"}`}>
+                  {sharingMessage}
+                </p>
+              )}
+            </div>
+            <Button
+              variant={sharingWithEcobank ? "secondary" : "primary"}
+              disabled={sharingBusy}
+              onClick={async () => {
+                setSharingBusy(true);
+                setSharingMessage("");
+                try {
+                  const result = await setEcobankSharingConsent(!sharingWithEcobank);
+                  setSharingWithEcobank(result.sharingConsent.granted);
+                  await refreshUser();
+                  setSharingMessage(result.message);
+                } catch (err) {
+                  setSharingMessage(err instanceof Error ? `Unable to update sharing: ${err.message}` : "Unable to update sharing right now.");
+                } finally {
+                  setSharingBusy(false);
+                }
+              }}
+            >
+              {sharingBusy ? "Updating…" : sharingWithEcobank ? "Stop sharing" : "Share with Ecobank"}
+            </Button>
+          </div>
+          <p className="mt-3 border-t border-[#E2EAF2] pt-3 text-xs text-[#94A3B8]">
+            Competition prototype: the portal uses simulated data. Real bank access would require an authorised connection or a customer-provided statement, never an account number alone.
+          </p>
         </Card>
 
         <div className="mb-6">

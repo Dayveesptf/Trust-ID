@@ -18,11 +18,11 @@ interface Props {
  * 742 / 850 — Strong
  */
 const simulatedFinancialProfile = {
-  incomeConsistency: 90,
-  savingsRate: 88,
+  incomeConsistency: 99,
+  savingsRate: 92,
   savingsStreakMonths: 4,
   repaymentOnTimeRate: 95,
-  missedPayments: 2,
+  missedPayments: 1,
   cashFlowStability: 90,
   lowBalanceDays: 3,
   budgetingDiscipline: 90,
@@ -92,9 +92,7 @@ export default function ConnectPage({ navigate }: Props) {
           </h1>
 
           <p className="text-sm text-[#64748B] leading-relaxed mb-8">
-            For this prototype, we're using simulated financial activity to
-            demonstrate how TrustID works. In production, TrustID would analyse
-            your real financial behaviour with your explicit consent.
+            For this prototype, the account shown is a sample and the financial activity is simulated. A real account number alone cannot give TrustID access to transactions. A real implementation would require a secure, authorised bank connection or a statement you choose to provide.
           </p>
 
           {/* Connected account card */}
@@ -107,17 +105,17 @@ export default function ConnectPage({ navigate }: Props) {
 
                 <div>
                   <p className="text-sm font-bold text-[#0D1F35]">
-                    Ecobank Nigeria
+                    Ecobank Nigeria · Demo account
                   </p>
                   <p className="text-xs text-[#64748B]">
-                    Current Account · ****4521
+                    Sample reference · ****4521 · Not connected to a real bank
                   </p>
                 </div>
               </div>
 
               <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 text-xs font-semibold px-3 py-1 rounded-full border border-emerald-200">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Connected
+                Demo ready
               </div>
             </div>
 
@@ -164,7 +162,7 @@ export default function ConnectPage({ navigate }: Props) {
                 Ready to analyse
               </p>
               <p className="text-xs text-[#64748B]">
-                7 months of simulated financial activity prepared
+                7 months of sample activity prepared for this demonstration
               </p>
             </div>
 
@@ -217,7 +215,7 @@ export default function ConnectPage({ navigate }: Props) {
         </Button>
 
         <p className="text-center text-xs text-[#94A3B8] mt-4">
-          Analysis takes approximately 10 seconds · Demo prototype only
+          Sample analysis only · No real account is accessed in this prototype
         </p>
       </div>
     </div>
